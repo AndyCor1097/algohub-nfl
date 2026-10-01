@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AlgoHub NFL Week 4</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0e13;--card:#12161d;--card2:#171c25;--line:#222a35;--tx:#e6edf3;--mu:#7d8590;
+--lean:#58a6ff;--play:#3fb950;--ham:#f2b134;--neg:#f85149}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font:14px/1.4 Inter,system-ui,sans-serif;padding:28px 16px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+.num,.proj,.cols span,.top h1,.stats b,.wplab,.sval,.pick{font-family:"Barlow Condensed",sans-serif}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px}
+.top .k{color:var(--mu);font-size:12px;letter-spacing:.18em;font-weight:600}
+.top h1{font-size:44px;font-weight:800;letter-spacing:.02em;line-height:1}
+.stats{display:flex;gap:22px} .stats div{text-align:right} .stats small{display:block;color:var(--mu);font-size:11px;letter-spacing:.14em}
+.stats b{font-size:30px} .stats .h b{color:var(--ham)} .stats .p b{color:var(--play)}
+.tabs{display:flex;gap:6px;margin:18px 0 6px;flex-wrap:wrap}
+.tabs button{background:transparent;border:1px solid var(--line);color:var(--mu);padding:7px 14px;border-radius:999px;font:600 12px Inter,system-ui,sans-serif;letter-spacing:.08em;cursor:pointer}
+.tabs button.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;margin:26px 0 12px}
+.dayhead h2{font:700 13px Inter,system-ui,sans-serif;letter-spacing:.16em} .dayhead span{color:var(--mu);font-size:11px;letter-spacing:.14em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;border-top:3px solid var(--line)}
+.card.b-lean{border-top-color:var(--lean)} .card.b-play{border-top-color:var(--play)}
+.card.b-hammer{border-top-color:var(--ham);box-shadow:0 0 0 1px rgba(242,177,52,.25),0 8px 30px rgba(242,177,52,.08)}
+.meta{display:flex;justify-content:space-between;gap:10px;padding:11px 16px;color:var(--mu);font-size:11px;letter-spacing:.08em;border-bottom:1px solid var(--line)}
+.meta span:last-child{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.badge{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font:800 13px "Barlow Condensed";letter-spacing:.04em;flex:none}
+.tname{flex:1;min-width:0} .tname b{display:block;font-size:16px;font-weight:600} .tname small{color:var(--mu);font-size:12px}
+.proj{font-size:32px;font-weight:700;color:var(--mu)} .team.fav .proj{color:var(--tx)}
+.wp{padding:6px 16px 14px} .wplab{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:6px}
+.wplab .cap{color:var(--mu);font:600 10px Inter,system-ui,sans-serif;letter-spacing:.16em;align-self:center}
+.wpbar{display:flex;height:8px;border-radius:99px;overflow:hidden;gap:2px;background:var(--line)} .wpbar i{display:block;height:100%}
+.mkt{border-top:1px solid var(--line);padding:12px 16px;background:var(--card2)}
+.mlabel{color:var(--mu);font:600 10px Inter,system-ui,sans-serif;letter-spacing:.18em;margin-bottom:8px} .mlabel em{font-style:normal;letter-spacing:.04em;opacity:.7}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px} .cols small{display:block;color:var(--mu);font-size:10px;letter-spacing:.14em}
+.cols span{font-size:20px;font-weight:700} .edge span{color:var(--mu)} .edge.hot span{color:var(--tx);font-size:26px}
+.pick{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;letter-spacing:.02em}
+.pick .tier{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.14em;padding:4px 8px;border-radius:6px;color:#0b0e13}
+.t-lean .tier{background:var(--lean)} .t-play .tier{background:var(--play)} .t-hammer .tier{background:var(--ham)}
+.t-hammer{color:var(--ham)} .pick.none{color:#4b535d;font:600 12px Inter,system-ui,sans-serif;letter-spacing:.16em}
+.ml{border-top:1px solid var(--line);padding:10px 16px;font-size:12px;color:var(--mu);letter-spacing:.06em;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ml b{color:var(--play);font-size:14px}
+.strip{border-top:1px solid var(--line);padding:12px 16px}
+.srow{display:grid;grid-template-columns:1fr 90px 46px;align-items:center;gap:10px;font-size:12px;padding:3px 0}
+.slab em{color:var(--mu);font-style:normal}
+.sbar{position:relative;height:6px;background:var(--line);border-radius:99px}
+.sbar::after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:12px;background:var(--mu)}
+.sbar i{position:absolute;top:0;height:100%;border-radius:99px} .sbar i.pos{left:50%;background:var(--play)} .sbar i.neg{right:50%;background:var(--neg)}
+.sval{text-align:right;font-size:15px;font-weight:700} .sval.pos{color:var(--play)} .sval.neg{color:var(--neg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px}
+.chip{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.1em;color:#c9d1d9;border:1px solid var(--line);background:#0f1319;padding:4px 8px;border-radius:6px}
+.foot{color:var(--mu);font-size:11px;margin-top:30px;letter-spacing:.06em}
+.hide{display:none}
+</style></head><body><div class="wrap">
+  <div class="top">
+    <div><div class="k">THE ALGOHUB · NFL GAME ALGO · 2026</div><h1>WEEK 4</h1></div>
+    <div class="stats">
+      <div><small>GAMES</small><b>16</b></div>
+      <div class="p"><small>PLAYS</small><b>20</b></div>
+      <div class="h"><small>HAMMERS</small><b>11</b></div>
+    </div>
+  </div>
+  <div class="tabs"><button class="on" data-f="all">ALL</button><button data-f="plays">PLAYS ONLY</button><button data-f="THU">THU</button><button data-f="SUN">SUN</button><button data-f="MON">MON</button></div>
+  
+  <section class="day" data-day="THU">
+    <div class="dayhead"><h2>THURSDAY, OCTOBER 1</h2><span>1 GAME</span></div>
+    <div class="grid">
+    <article class="card b-hammer" data-day="THU" data-play="1" data-rank="3">
+      <header class="meta"><span>THU · TBD ET</span><span>Huntington Bank Field</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#FFB612;color:#000">PIT</span>
+        <div class="tname"><b>Steelers</b><small>2-1 · Aaron Rodgers</small></div>
+        <div class="proj">20.7</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#FF3C00;color:#000">CLE</span>
+        <div class="tname"><b>Browns</b><small>2-1 · Deshaun Watson</small></div>
+        <div class="proj">24.2</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>PIT 40%</span><span class="cap">WIN PROB</span><span>CLE 60%</span></div>
+        <div class="wpbar"><i style="width:39.9%;background:#FFB612"></i><i style="width:60.1%;background:#FF3C00"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>PIT -2.5</span></div>
+          <div><small>MODEL</small><span>CLE -3.5</span></div>
+          <div class="edge hot"><small>EDGE</small><span>6.0</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>CLE +2.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>38.5</span></div>
+          <div><small>MODEL</small><span>44.9</span></div>
+          <div class="edge hot"><small>EDGE</small><span>6.4</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>OVER 38.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">PIT PASS O <em>vs</em> CLE D</span>
+            <span class="sbar"><i class="neg" style="width:23.7%"></i></span>
+            <span class="sval neg">-0.14</span></div>
+          <div class="srow"><span class="slab">PIT RUSH O <em>vs</em> CLE D</span>
+            <span class="sbar"><i class="pos" style="width:0.8%"></i></span>
+            <span class="sval pos">+0.00</span></div>
+          <div class="srow"><span class="slab">CLE PASS O <em>vs</em> PIT D</span>
+            <span class="sbar"><i class="neg" style="width:6.6%"></i></span>
+            <span class="sval neg">-0.04</span></div>
+          <div class="srow"><span class="slab">CLE RUSH O <em>vs</em> PIT D</span>
+            <span class="sbar"><i class="neg" style="width:7.4%"></i></span>
+            <span class="sval neg">-0.04</span></div></div>
+      <div class="chips"><span class="chip">PIT SHORT WEEK</span><span class="chip">CLE SHORT WEEK</span><span class="chip">DIVISION</span></div>
+    </article></div>
+  </section>
+  <section class="day" data-day="SUN">
+    <div class="dayhead"><h2>SUNDAY, OCTOBER 4</h2><span>14 GAMES</span></div>
+    <div class="grid">
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · TBD ET</span><span>MetLife Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#97233F;color:#fff">ARI</span>
+        <div class="tname"><b>Cardinals</b><small>1-2 · Jacoby Brissett</small></div>
+        <div class="proj">21.0</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#0B2265;color:#fff">NYG</span>
+        <div class="tname"><b>Giants</b><small>2-1 · Jameis Winston</small></div>
+        <div class="proj">20.4</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>ARI 52%</span><span class="cap">WIN PROB</span><span>NYG 48%</span></div>
+        <div class="wpbar"><i style="width:51.8%;background:#97233F"></i><i style="width:48.2%;background:#0B2265"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>ARI -1.5</span></div>
+          <div><small>MODEL</small><span>ARI -0.6</span></div>
+          <div class="edge "><small>EDGE</small><span>0.9</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>44.5</span></div>
+          <div><small>MODEL</small><span>41.4</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.1</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>UNDER 44.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">ARI PASS O <em>vs</em> NYG D</span>
+            <span class="sbar"><i class="pos" style="width:22.6%"></i></span>
+            <span class="sval pos">+0.14</span></div>
+          <div class="srow"><span class="slab">ARI RUSH O <em>vs</em> NYG D</span>
+            <span class="sbar"><i class="neg" style="width:2.1%"></i></span>
+            <span class="sval neg">-0.01</span></div>
+          <div class="srow"><span class="slab">NYG PASS O <em>vs</em> ARI D</span>
+            <span class="sbar"><i class="pos" style="width:23.9%"></i></span>
+            <span class="sval pos">+0.14</span></div>
+          <div class="srow"><span class="slab">NYG RUSH O <em>vs</em> ARI D</span>
+            <span class="sbar"><i class="neg" style="width:10.9%"></i></span>
+            <span class="sval neg">-0.07</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Reliant Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#041E42;color:#fff">DAL</span>
+        <div class="tname"><b>Cowboys</b><small>1-2 · Dak Prescott</small></div>
+        <div class="proj">26.5</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#03202F;color:#fff">HOU</span>
+        <div class="tname"><b>Texans</b><small>0-3 · C.J. Stroud</small></div>
+        <div class="proj">24.2</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>DAL 56%</span><span class="cap">WIN PROB</span><span>HOU 44%</span></div>
+        <div class="wpbar"><i style="width:56.4%;background:#041E42"></i><i style="width:43.6%;background:#03202F"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>HOU -2.5</span></div>
+          <div><small>MODEL</small><span>DAL -2.2</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.7</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>DAL +2.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>47.5</span></div>
+          <div><small>MODEL</small><span>50.7</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.2</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>OVER 47.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">DAL PASS O <em>vs</em> HOU D</span>
+            <span class="sbar"><i class="pos" style="width:27.5%"></i></span>
+            <span class="sval pos">+0.16</span></div>
+          <div class="srow"><span class="slab">DAL RUSH O <em>vs</em> HOU D</span>
+            <span class="sbar"><i class="neg" style="width:6.4%"></i></span>
+            <span class="sval neg">-0.04</span></div>
+          <div class="srow"><span class="slab">HOU PASS O <em>vs</em> DAL D</span>
+            <span class="sbar"><i class="pos" style="width:18.6%"></i></span>
+            <span class="sval pos">+0.11</span></div>
+          <div class="srow"><span class="slab">HOU RUSH O <em>vs</em> DAL D</span>
+            <span class="sbar"><i class="neg" style="width:1.1%"></i></span>
+            <span class="sval neg">-0.01</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Levi&#x27;s Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#FB4F14;color:#000">DEN</span>
+        <div class="tname"><b>Broncos</b><small>2-1 · Bo Nix</small></div>
+        <div class="proj">18.2</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#AA0000;color:#fff">SF</span>
+        <div class="tname"><b>49ers</b><small>3-0 · Brock Purdy</small></div>
+        <div class="proj">30.8</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>DEN 18%</span><span class="cap">WIN PROB</span><span>SF 82%</span></div>
+        <div class="wpbar"><i style="width:18.2%;background:#FB4F14"></i><i style="width:81.8%;background:#AA0000"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>SF -3.0</span></div>
+          <div><small>MODEL</small><span>SF -12.6</span></div>
+          <div class="edge hot"><small>EDGE</small><span>9.6</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>SF -3.0</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>46.5</span></div>
+          <div><small>MODEL</small><span>48.9</span></div>
+          <div class="edge "><small>EDGE</small><span>2.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">DEN PASS O <em>vs</em> SF D</span>
+            <span class="sbar"><i class="neg" style="width:5.7%"></i></span>
+            <span class="sval neg">-0.03</span></div>
+          <div class="srow"><span class="slab">DEN RUSH O <em>vs</em> SF D</span>
+            <span class="sbar"><i class="neg" style="width:2.8%"></i></span>
+            <span class="sval neg">-0.02</span></div>
+          <div class="srow"><span class="slab">SF PASS O <em>vs</em> DEN D</span>
+            <span class="sbar"><i class="pos" style="width:35.0%"></i></span>
+            <span class="sval pos">+0.21</span></div>
+          <div class="srow"><span class="slab">SF RUSH O <em>vs</em> DEN D</span>
+            <span class="sbar"><i class="pos" style="width:27.6%"></i></span>
+            <span class="sval pos">+0.17</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · TBD ET</span><span>Bank of America Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0076B6;color:#fff">DET</span>
+        <div class="tname"><b>Lions</b><small>2-1 · Jared Goff</small></div>
+        <div class="proj">29.4</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#0085CA;color:#fff">CAR</span>
+        <div class="tname"><b>Panthers</b><small>1-2 · Bryce Young</small></div>
+        <div class="proj">23.2</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>DET 67%</span><span class="cap">WIN PROB</span><span>CAR 33%</span></div>
+        <div class="wpbar"><i style="width:67.2%;background:#0076B6"></i><i style="width:32.8%;background:#0085CA"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>DET -3.5</span></div>
+          <div><small>MODEL</small><span>DET -6.2</span></div>
+          <div class="edge hot"><small>EDGE</small><span>2.7</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>DET -3.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>50.5</span></div>
+          <div><small>MODEL</small><span>52.6</span></div>
+          <div class="edge "><small>EDGE</small><span>2.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">DET PASS O <em>vs</em> CAR D</span>
+            <span class="sbar"><i class="pos" style="width:12.3%"></i></span>
+            <span class="sval pos">+0.07</span></div>
+          <div class="srow"><span class="slab">DET RUSH O <em>vs</em> CAR D</span>
+            <span class="sbar"><i class="pos" style="width:4.9%"></i></span>
+            <span class="sval pos">+0.03</span></div>
+          <div class="srow"><span class="slab">CAR PASS O <em>vs</em> DET D</span>
+            <span class="sbar"><i class="pos" style="width:23.3%"></i></span>
+            <span class="sval pos">+0.14</span></div>
+          <div class="srow"><span class="slab">CAR RUSH O <em>vs</em> DET D</span>
+            <span class="sbar"><i class="pos" style="width:7.0%"></i></span>
+            <span class="sval pos">+0.04</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Raymond James Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#203731;color:#FFB612">GB</span>
+        <div class="tname"><b>Packers</b><small>1-2 · Jordan Love</small></div>
+        <div class="proj">21.8</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#D50A0A;color:#fff">TB</span>
+        <div class="tname"><b>Buccaneers</b><small>0-3 · Baker Mayfield</small></div>
+        <div class="proj">23.8</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>GB 44%</span><span class="cap">WIN PROB</span><span>TB 56%</span></div>
+        <div class="wpbar"><i style="width:44.4%;background:#203731"></i><i style="width:55.6%;background:#D50A0A"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>GB -3.5</span></div>
+          <div><small>MODEL</small><span>TB -2.0</span></div>
+          <div class="edge hot"><small>EDGE</small><span>5.5</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>TB +3.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>39.5</span></div>
+          <div><small>MODEL</small><span>45.5</span></div>
+          <div class="edge hot"><small>EDGE</small><span>6.0</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>OVER 39.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">GB PASS O <em>vs</em> TB D</span>
+            <span class="sbar"><i class="neg" style="width:8.9%"></i></span>
+            <span class="sval neg">-0.05</span></div>
+          <div class="srow"><span class="slab">GB RUSH O <em>vs</em> TB D</span>
+            <span class="sbar"><i class="neg" style="width:29.3%"></i></span>
+            <span class="sval neg">-0.18</span></div>
+          <div class="srow"><span class="slab">TB PASS O <em>vs</em> GB D</span>
+            <span class="sbar"><i class="neg" style="width:16.8%"></i></span>
+            <span class="sval neg">-0.10</span></div>
+          <div class="srow"><span class="slab">TB RUSH O <em>vs</em> GB D</span>
+            <span class="sbar"><i class="pos" style="width:2.7%"></i></span>
+            <span class="sval pos">+0.02</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · TBD ET</span><span>Tottenham Hotspur Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#002C5F;color:#fff">IND</span>
+        <div class="tname"><b>Colts</b><small>1-2 · Daniel Jones</small></div>
+        <div class="proj">24.7</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#30363d;color:#fff">WSH</span>
+        <div class="tname"><b>WSH</b><small>1-2</small></div>
+        <div class="proj">22.9</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>IND 55%</span><span class="cap">WIN PROB</span><span>WSH 45%</span></div>
+        <div class="wpbar"><i style="width:55.1%;background:#002C5F"></i><i style="width:44.9%;background:#777"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>IND -3.5</span></div>
+          <div><small>MODEL</small><span>IND -1.8</span></div>
+          <div class="edge "><small>EDGE</small><span>1.7</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>47.5</span></div>
+          <div><small>MODEL</small><span>47.6</span></div>
+          <div class="edge "><small>EDGE</small><span>0.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">IND PASS O <em>vs</em> WSH D</span>
+            <span class="sbar"><i class="pos" style="width:0.1%"></i></span>
+            <span class="sval pos">+0.00</span></div>
+          <div class="srow"><span class="slab">IND RUSH O <em>vs</em> WSH D</span>
+            <span class="sbar"><i class="pos" style="width:0.9%"></i></span>
+            <span class="sval pos">+0.01</span></div>
+          <div class="srow"><span class="slab">WSH PASS O <em>vs</em> IND D</span>
+            <span class="sbar"><i class="pos" style="width:18.9%"></i></span>
+            <span class="sval pos">+0.11</span></div>
+          <div class="srow"><span class="slab">WSH RUSH O <em>vs</em> IND D</span>
+            <span class="sbar"><i class="pos" style="width:12.9%"></i></span>
+            <span class="sval pos">+0.08</span></div></div>
+      <div class="chips"><span class="chip">INTL</span><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Paycor Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#006778;color:#fff">JAX</span>
+        <div class="tname"><b>Jaguars</b><small>2-1 · Trevor Lawrence</small></div>
+        <div class="proj">27.9</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#FB4F14;color:#000">CIN</span>
+        <div class="tname"><b>Bengals</b><small>2-1 · Joe Burrow</small></div>
+        <div class="proj">25.2</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>JAX 58%</span><span class="cap">WIN PROB</span><span>CIN 42%</span></div>
+        <div class="wpbar"><i style="width:57.6%;background:#006778"></i><i style="width:42.4%;background:#FB4F14"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>CIN -2.5</span></div>
+          <div><small>MODEL</small><span>JAX -2.7</span></div>
+          <div class="edge hot"><small>EDGE</small><span>5.2</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>JAX +2.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>51.5</span></div>
+          <div><small>MODEL</small><span>53.1</span></div>
+          <div class="edge "><small>EDGE</small><span>1.6</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">JAX PASS O <em>vs</em> CIN D</span>
+            <span class="sbar"><i class="pos" style="width:9.7%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">JAX RUSH O <em>vs</em> CIN D</span>
+            <span class="sbar"><i class="pos" style="width:1.8%"></i></span>
+            <span class="sval pos">+0.01</span></div>
+          <div class="srow"><span class="slab">CIN PASS O <em>vs</em> JAX D</span>
+            <span class="sbar"><i class="neg" style="width:7.5%"></i></span>
+            <span class="sval neg">-0.05</span></div>
+          <div class="srow"><span class="slab">CIN RUSH O <em>vs</em> JAX D</span>
+            <span class="sbar"><i class="pos" style="width:1.9%"></i></span>
+            <span class="sval pos">+0.01</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · TBD ET</span><span>Allegiant Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#E31837;color:#fff">KC</span>
+        <div class="tname"><b>Chiefs</b><small>3-0 · Patrick Mahomes</small></div>
+        <div class="proj">26.7</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#000000;color:#A5ACAF">LV</span>
+        <div class="tname"><b>Raiders</b><small>3-0 · Kirk Cousins</small></div>
+        <div class="proj">21.8</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>KC 64%</span><span class="cap">WIN PROB</span><span>LV 36%</span></div>
+        <div class="wpbar"><i style="width:63.7%;background:#E31837"></i><i style="width:36.3%;background:#000000"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>KC -4.5</span></div>
+          <div><small>MODEL</small><span>KC -4.9</span></div>
+          <div class="edge "><small>EDGE</small><span>0.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>47.5</span></div>
+          <div><small>MODEL</small><span>48.5</span></div>
+          <div class="edge "><small>EDGE</small><span>1.0</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">KC PASS O <em>vs</em> LV D</span>
+            <span class="sbar"><i class="pos" style="width:2.2%"></i></span>
+            <span class="sval pos">+0.01</span></div>
+          <div class="srow"><span class="slab">KC RUSH O <em>vs</em> LV D</span>
+            <span class="sbar"><i class="pos" style="width:0.4%"></i></span>
+            <span class="sval pos">+0.00</span></div>
+          <div class="srow"><span class="slab">LV PASS O <em>vs</em> KC D</span>
+            <span class="sbar"><i class="neg" style="width:1.3%"></i></span>
+            <span class="sval neg">-0.01</span></div>
+          <div class="srow"><span class="slab">LV RUSH O <em>vs</em> KC D</span>
+            <span class="sbar"><i class="neg" style="width:14.0%"></i></span>
+            <span class="sval neg">-0.08</span></div></div>
+      <div class="chips"><span class="chip">DOME</span><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Lumen Field</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#0080C6;color:#fff">LAC</span>
+        <div class="tname"><b>Chargers</b><small>0-3 · Justin Herbert</small></div>
+        <div class="proj">14.0</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#002244;color:#69BE28">SEA</span>
+        <div class="tname"><b>Seahawks</b><small>2-1 · Sam Darnold</small></div>
+        <div class="proj">25.6</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>LAC 20%</span><span class="cap">WIN PROB</span><span>SEA 80%</span></div>
+        <div class="wpbar"><i style="width:20.1%;background:#0080C6"></i><i style="width:79.9%;background:#002244"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>SEA -7.0</span></div>
+          <div><small>MODEL</small><span>SEA -11.6</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.6</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>SEA -7.0</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>42.5</span></div>
+          <div><small>MODEL</small><span>39.5</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.0</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>UNDER 42.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">LAC PASS O <em>vs</em> SEA D</span>
+            <span class="sbar"><i class="neg" style="width:20.8%"></i></span>
+            <span class="sval neg">-0.12</span></div>
+          <div class="srow"><span class="slab">LAC RUSH O <em>vs</em> SEA D</span>
+            <span class="sbar"><i class="neg" style="width:33.2%"></i></span>
+            <span class="sval neg">-0.20</span></div>
+          <div class="srow"><span class="slab">SEA PASS O <em>vs</em> LAC D</span>
+            <span class="sbar"><i class="pos" style="width:24.4%"></i></span>
+            <span class="sval pos">+0.15</span></div>
+          <div class="srow"><span class="slab">SEA RUSH O <em>vs</em> LAC D</span>
+            <span class="sbar"><i class="neg" style="width:16.5%"></i></span>
+            <span class="sval neg">-0.10</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · TBD ET</span><span>Lincoln Financial Field</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#003594;color:#FFD100">LA</span>
+        <div class="tname"><b>Rams</b><small>1-2 · Matthew Stafford</small></div>
+        <div class="proj">22.2</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#004C54;color:#fff">PHI</span>
+        <div class="tname"><b>Eagles</b><small>2-1 · Jalen Hurts</small></div>
+        <div class="proj">19.9</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>LA 57%</span><span class="cap">WIN PROB</span><span>PHI 43%</span></div>
+        <div class="wpbar"><i style="width:56.6%;background:#003594"></i><i style="width:43.4%;background:#004C54"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>LA -3.0</span></div>
+          <div><small>MODEL</small><span>LA -2.3</span></div>
+          <div class="edge "><small>EDGE</small><span>0.7</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>44.5</span></div>
+          <div><small>MODEL</small><span>42.1</span></div>
+          <div class="edge "><small>EDGE</small><span>2.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">LA PASS O <em>vs</em> PHI D</span>
+            <span class="sbar"><i class="pos" style="width:10.1%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">LA RUSH O <em>vs</em> PHI D</span>
+            <span class="sbar"><i class="pos" style="width:4.8%"></i></span>
+            <span class="sval pos">+0.03</span></div>
+          <div class="srow"><span class="slab">PHI PASS O <em>vs</em> LA D</span>
+            <span class="sbar"><i class="neg" style="width:22.5%"></i></span>
+            <span class="sval neg">-0.13</span></div>
+          <div class="srow"><span class="slab">PHI RUSH O <em>vs</em> LA D</span>
+            <span class="sbar"><i class="pos" style="width:8.9%"></i></span>
+            <span class="sval pos">+0.05</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span><span class="chip">LA CROSS-COUNTRY</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>U.S. Bank Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#008E97;color:#fff">MIA</span>
+        <div class="tname"><b>Dolphins</b><small>0-3 · Malik Willis</small></div>
+        <div class="proj">22.2</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#4F2683;color:#FFC62F">MIN</span>
+        <div class="tname"><b>Vikings</b><small>3-0 · Kyler Murray</small></div>
+        <div class="proj">18.9</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>MIA 59%</span><span class="cap">WIN PROB</span><span>MIN 41%</span></div>
+        <div class="wpbar"><i style="width:59.4%;background:#008E97"></i><i style="width:40.6%;background:#4F2683"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>MIN -11.5</span></div>
+          <div><small>MODEL</small><span>MIA -3.3</span></div>
+          <div class="edge hot"><small>EDGE</small><span>14.8</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>MIA +11.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>38.5</span></div>
+          <div><small>MODEL</small><span>41.1</span></div>
+          <div class="edge hot"><small>EDGE</small><span>2.6</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>OVER 38.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">MIA PASS O <em>vs</em> MIN D</span>
+            <span class="sbar"><i class="neg" style="width:23.4%"></i></span>
+            <span class="sval neg">-0.14</span></div>
+          <div class="srow"><span class="slab">MIA RUSH O <em>vs</em> MIN D</span>
+            <span class="sbar"><i class="neg" style="width:26.4%"></i></span>
+            <span class="sval neg">-0.16</span></div>
+          <div class="srow"><span class="slab">MIN PASS O <em>vs</em> MIA D</span>
+            <span class="sbar"><i class="pos" style="width:20.1%"></i></span>
+            <span class="sval pos">+0.12</span></div>
+          <div class="srow"><span class="slab">MIN RUSH O <em>vs</em> MIA D</span>
+            <span class="sbar"><i class="neg" style="width:12.9%"></i></span>
+            <span class="sval neg">-0.08</span></div></div>
+      <div class="chips"><span class="chip">DOME</span><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · TBD ET</span><span>Highmark Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#002244;color:#fff">NE</span>
+        <div class="tname"><b>Patriots</b><small>1-2 · Drake Maye</small></div>
+        <div class="proj">18.8</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#00338D;color:#fff">BUF</span>
+        <div class="tname"><b>Bills</b><small>3-0 · Josh Allen</small></div>
+        <div class="proj">26.7</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>NE 29%</span><span class="cap">WIN PROB</span><span>BUF 71%</span></div>
+        <div class="wpbar"><i style="width:28.6%;background:#002244"></i><i style="width:71.4%;background:#00338D"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>BUF -7.0</span></div>
+          <div><small>MODEL</small><span>BUF -7.8</span></div>
+          <div class="edge "><small>EDGE</small><span>0.8</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>48.5</span></div>
+          <div><small>MODEL</small><span>45.5</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.0</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>UNDER 48.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">NE PASS O <em>vs</em> BUF D</span>
+            <span class="sbar"><i class="neg" style="width:13.1%"></i></span>
+            <span class="sval neg">-0.08</span></div>
+          <div class="srow"><span class="slab">NE RUSH O <em>vs</em> BUF D</span>
+            <span class="sbar"><i class="pos" style="width:4.6%"></i></span>
+            <span class="sval pos">+0.03</span></div>
+          <div class="srow"><span class="slab">BUF PASS O <em>vs</em> NE D</span>
+            <span class="sbar"><i class="pos" style="width:8.3%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">BUF RUSH O <em>vs</em> NE D</span>
+            <span class="sbar"><i class="pos" style="width:22.8%"></i></span>
+            <span class="sval pos">+0.14</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-hammer" data-day="SUN" data-play="1" data-rank="3">
+      <header class="meta"><span>SUN · TBD ET</span><span>Soldier Field</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#125740;color:#fff">NYJ</span>
+        <div class="tname"><b>Jets</b><small>1-2 · Geno Smith</small></div>
+        <div class="proj">21.4</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0B162A;color:#fff">CHI</span>
+        <div class="tname"><b>Bears</b><small>2-1 · Case Keenum</small></div>
+        <div class="proj">29.7</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>NYJ 27%</span><span class="cap">WIN PROB</span><span>CHI 73%</span></div>
+        <div class="wpbar"><i style="width:27.3%;background:#125740"></i><i style="width:72.7%;background:#0B162A"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>CHI -3.5</span></div>
+          <div><small>MODEL</small><span>CHI -8.4</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.9</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>CHI -3.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>42.5</span></div>
+          <div><small>MODEL</small><span>51.1</span></div>
+          <div class="edge hot"><small>EDGE</small><span>8.6</span></div>
+        </div>
+        <div class="pick t-hammer"><span class="tier">HAMMER</span>OVER 42.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">NYJ PASS O <em>vs</em> CHI D</span>
+            <span class="sbar"><i class="pos" style="width:7.2%"></i></span>
+            <span class="sval pos">+0.04</span></div>
+          <div class="srow"><span class="slab">NYJ RUSH O <em>vs</em> CHI D</span>
+            <span class="sbar"><i class="neg" style="width:7.8%"></i></span>
+            <span class="sval neg">-0.05</span></div>
+          <div class="srow"><span class="slab">CHI PASS O <em>vs</em> NYJ D</span>
+            <span class="sbar"><i class="pos" style="width:11.3%"></i></span>
+            <span class="sval pos">+0.07</span></div>
+          <div class="srow"><span class="slab">CHI RUSH O <em>vs</em> NYJ D</span>
+            <span class="sbar"><i class="pos" style="width:5.6%"></i></span>
+            <span class="sval pos">+0.03</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · TBD ET</span><span>M&amp;T Bank Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#0C2340;color:#4B92DB">TEN</span>
+        <div class="tname"><b>Titans</b><small>0-3 · Cam Ward</small></div>
+        <div class="proj">18.7</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#241773;color:#fff">BAL</span>
+        <div class="tname"><b>Ravens</b><small>2-1 · Lamar Jackson</small></div>
+        <div class="proj">28.0</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>TEN 25%</span><span class="cap">WIN PROB</span><span>BAL 75%</span></div>
+        <div class="wpbar"><i style="width:25.2%;background:#0C2340"></i><i style="width:74.8%;background:#241773"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>BAL -11.5</span></div>
+          <div><small>MODEL</small><span>BAL -9.3</span></div>
+          <div class="edge hot"><small>EDGE</small><span>2.2</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>TEN +11.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>43.5</span></div>
+          <div><small>MODEL</small><span>46.7</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.2</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>OVER 43.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">TEN PASS O <em>vs</em> BAL D</span>
+            <span class="sbar"><i class="neg" style="width:12.0%"></i></span>
+            <span class="sval neg">-0.07</span></div>
+          <div class="srow"><span class="slab">TEN RUSH O <em>vs</em> BAL D</span>
+            <span class="sbar"><i class="pos" style="width:9.2%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">BAL PASS O <em>vs</em> TEN D</span>
+            <span class="sbar"><i class="pos" style="width:29.3%"></i></span>
+            <span class="sval pos">+0.18</span></div>
+          <div class="srow"><span class="slab">BAL RUSH O <em>vs</em> TEN D</span>
+            <span class="sbar"><i class="pos" style="width:8.3%"></i></span>
+            <span class="sval pos">+0.05</span></div></div>
+      <div class="chips"><span class="chip">DIVISION</span></div>
+    </article></div>
+  </section>
+  <section class="day" data-day="MON">
+    <div class="dayhead"><h2>MONDAY, OCTOBER 5</h2><span>1 GAME</span></div>
+    <div class="grid">
+    <article class="card b-play" data-day="MON" data-play="1" data-rank="2">
+      <header class="meta"><span>MON · TBD ET</span><span>Caesars Superdome</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#A71930;color:#fff">ATL</span>
+        <div class="tname"><b>Falcons</b><small>1-2 · Michael Penix Jr.</small></div>
+        <div class="proj">24.5</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#D3BC8D;color:#000">NO</span>
+        <div class="tname"><b>Saints</b><small>1-2 · Tyler Shough</small></div>
+        <div class="proj">29.1</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>ATL 37%</span><span class="cap">WIN PROB</span><span>NO 63%</span></div>
+        <div class="wpbar"><i style="width:37.0%;background:#A71930"></i><i style="width:63.0%;background:#D3BC8D"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>NO -3.0</span></div>
+          <div><small>MODEL</small><span>NO -4.6</span></div>
+          <div class="edge "><small>EDGE</small><span>1.6</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>48.5</span></div>
+          <div><small>MODEL</small><span>53.7</span></div>
+          <div class="edge hot"><small>EDGE</small><span>5.2</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>OVER 48.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">ATL PASS O <em>vs</em> NO D</span>
+            <span class="sbar"><i class="neg" style="width:20.2%"></i></span>
+            <span class="sval neg">-0.12</span></div>
+          <div class="srow"><span class="slab">ATL RUSH O <em>vs</em> NO D</span>
+            <span class="sbar"><i class="pos" style="width:8.4%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">NO PASS O <em>vs</em> ATL D</span>
+            <span class="sbar"><i class="neg" style="width:1.8%"></i></span>
+            <span class="sval neg">-0.01</span></div>
+          <div class="srow"><span class="slab">NO RUSH O <em>vs</em> ATL D</span>
+            <span class="sbar"><i class="neg" style="width:7.8%"></i></span>
+            <span class="sval neg">-0.05</span></div></div>
+      <div class="chips"><span class="chip">DOME</span><span class="chip">DIVISION</span></div>
+    </article></div>
+  </section>
+  <p class="foot">Model trained on in-season team EPA only, shrunk toward league average. Edges in points vs. market. LEAN / PLAY / HAMMER tiers. Not betting advice.</p>
+</div>
+<script>
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  const f=b.dataset.f;
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('hide',
+    f==='plays'?c.dataset.play!=='1':(f!=='all'&&c.dataset.day!==f)));
+  document.querySelectorAll('.day').forEach(s=>s.classList.toggle('hide',
+    !s.querySelector('.card:not(.hide)')));
+});
+</script></body></html>
