@@ -134,7 +134,9 @@ def _prop_row(p):
         if not pd.isna(p.get("fair")):
             bits.append(("MKT", f'{p["fair"]:.0%}'))
         if tier_:
-            bits.append(("EV", f'+{p["edge"] * 100:.0f}%'))
+            bits.append(("EDGE", f'+{p["edge"] * 100:.1f}'))
+            if not pd.isna(p.get("ev")):
+                bits.append(("EV", f'{p["ev"] * 100:+.0f}%'))
         right = (f'<span class="ptier t-{tier_.lower()}"><i>{e(tier_)}</i>'
                  f'{e("YES" if is_td else p["pick"])} <small>{e(_s(p.get("book")))} {e(_odds(p.get("price")))}</small></span>'
                  if tier_ else '<span class="pnone">NO PLAY</span>')

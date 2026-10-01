@@ -85,7 +85,7 @@ with t_bets:
         m2.metric("Plays", int((bets.Tier == "PLAY").sum()))
         m3.metric("Leans", int((bets.Tier == "LEAN").sum()))
         st.dataframe(bets, hide_index=True, use_container_width=True)
-        st.caption("Edge = points vs. Vegas for spreads/totals; % over no-vig implied for ML and props.")
+        st.caption("Edge: points vs. Vegas for spreads/totals · % over no-vig for ML · probability points over the DraftKings break-even for props.")
     else:
         st.info("No plays clear the thresholds this week.")
 

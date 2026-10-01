@@ -33,7 +33,12 @@ MARKETS = {
 API_TO_MKT = {v[0]: k for k, v in MARKETS.items()}
 
 # edge = model prob - no-vig market prob
-PROP_TIERS = [(0.12, "HAMMER"), (0.08, "PLAY"), (0.05, "LEAN")]   # EV at the DraftKings price
+# tiers = model prob minus the DK price's break-even prob (percentage points).
+# (EV% is shown too, but it explodes on longshots, so it doesn't set tiers)
+PROP_TIERS = [(0.07, "HAMMER"), (0.05, "PLAY"), (0.03, "LEAN")]
+TD_MIN_PROB = 0.12     # no TD picks on guys the model gives <12%
+TD_MAX_PRICE = 700     # no TD picks longer than +700 (longshot noise, books are sharp there)
+TD_HOLD = 1.20         # anytime-TD "Yes" prices carry ~20% hold
 POS_CODE = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
 
 STAT_MAP = {  # short name -> nflverse column
@@ -273,6 +278,12 @@ def price_market(entry):
             io, iu = am_to_prob(v["over"][1]), am_to_prob(v["under"][1])
             fair.append(io / (io + iu))
     fair_over = float(np.mean(fair)) if len(fair) >= MIN_FAIR_BOOKS else None
+    if fair_over is None and line == 0.5 and under is None:
+        # yes-only markets (anytime TD): other books' Yes prices with typical hold removed
+        yes = [am_to_prob(v["over"][1]) for b, v in books.items()
+               if b != PRICE_BOOK and "over" in v and v["over"][0] == line]
+        if len(yes) >= MIN_FAIR_BOOKS:
+            fair_over = float(np.mean(yes)) / TD_HOLD
     return dict(line=float(line), over=float(over), under=float(under) if under is not None else None,
                 fair_over=fair_over, n_fair=len(fair), book="DK")
 
@@ -374,6 +385,8 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
         d = df[keep & (df.gp >= 1)].copy()
         if d.empty:
             continue
+        # only bet players inside the population the model was trained on
+        d["in_model"] = eligible(d, mkt)
         X = d[bundle["features"]]
         m = bundle["models"][mkt]
         d["proj"] = m.predict_proba(X)[:, 1] if mkt == "atd" else m.predict(X)
@@ -384,31 +397,38 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                        player_id=r.player_id, position=r.position, market=mkt, label=label,
                        proj=float(r.proj), line=np.nan, over_price=np.nan, under_price=np.nan,
                        p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="",
-                       book="", fair=np.nan, vs_mkt="")
+                       book="", fair=np.nan, vs_mkt="", ev=np.nan)
             if ln:
                 rec.update(line=ln["line"], over_price=ln["over"],
                            under_price=ln["under"] if ln["under"] is not None else np.nan, book=ln["book"])
                 po = float(r.proj) if mkt == "atd" else p_over(bundle, mkt, r.proj, ln["line"])
-                # edge = expected value of the bet at the DraftKings price
-                ev_o = po * nfl.am_to_dec(ln["over"]) - 1
-                ev_u = (1 - po) * nfl.am_to_dec(ln["under"]) - 1 if ln["under"] is not None else -1
+                # edge = model prob minus break-even prob of the DraftKings price
+                e_o = po - am_to_prob(ln["over"])
+                e_u = (1 - po) - am_to_prob(ln["under"]) if ln["under"] is not None else -1
                 if mkt == "atd":
-                    ev_u = -1  # only bet the Yes side on TDs
-                side = "over" if ev_o >= ev_u else "under"
-                edge = max(ev_o, ev_u)
+                    e_u = -1  # only bet the Yes side on TDs
+                side = "over" if e_o >= e_u else "under"
+                edge = max(e_o, e_u)
+                price = ln["over"] if side == "over" else ln["under"]
+                rec["ev"] = (po if side == "over" else 1 - po) * nfl.am_to_dec(price) - 1
                 tier_ = next((t for thr, t in PROP_TIERS if edge >= thr), "")
+                if not r.in_model:
+                    tier_, rec["vs_mkt"] = "", "low usage"
+                elif mkt == "atd" and (po < TD_MIN_PROB or ln["over"] > TD_MAX_PRICE):
+                    tier_, rec["vs_mkt"] = "", "longshot"
                 if ln["fair_over"] is not None:
                     fair_side = ln["fair_over"] if side == "over" else 1 - ln["fair_over"]
                     model_side = po if side == "over" else 1 - po
                     rec["fair"] = fair_side
                     # model fighting the whole market by a mile = usually stale info (injury, role), not edge
-                    if model_side - fair_side > MAX_VS_MARKET and tier_ in ("HAMMER", "PLAY"):
+                    too_far = (model_side > 1.6 * fair_side + 0.03) if mkt == "atd" else \
+                        (model_side - fair_side > MAX_VS_MARKET)
+                    if too_far and tier_ in ("HAMMER", "PLAY"):
                         tier_, rec["vs_mkt"] = "LEAN", "capped"
-                elif mkt != "atd" and tier_ == "HAMMER":
+                elif tier_ == "HAMMER":
                     # no market check available (thin / DK off-market line): don't go max confidence
                     tier_, rec["vs_mkt"] = "PLAY", "thin"
-                rec.update(p_over=po, edge=edge, side=side, tier=tier_,
-                           price=ln["over"] if side == "over" else ln["under"])
+                rec.update(p_over=po, edge=edge, side=side, tier=tier_, price=price)
                 if mkt == "atd":
                     rec["pick"] = f"{r.player_display_name} TD"
                 else:

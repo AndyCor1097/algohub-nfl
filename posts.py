@@ -116,7 +116,7 @@ def prop_items(props):
         td = r.market == "atd"
         pick = f"{r.player}  TD" if td else f"{r.player}  {r.pick}"
         sub = f"{r.label.upper()} · {int(r.price):+d}" + (f" · COV {r.cov_mark}" if isinstance(r.get("cov_mark"), str) and r.cov_mark else "")
-        out.append(dict(team=r.team, tier=r.tier, pick=pick, sub=sub, right=f"+{r.edge * 100:.0f}%"))
+        out.append(dict(team=r.team, tier=r.tier, pick=pick, sub=sub, right=f"+{r.edge * 100:.1f}"))
     return out
 
 
