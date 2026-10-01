@@ -53,8 +53,11 @@ ML_EDGE = 0.04               # model win prob minus no-vig implied prob
 # Shrinkage strength (in plays / games). Bigger = pulls harder toward league avg.
 K_PLAYS, K_PASS, K_RUSH, K_GAMES, K_QB = 170, 110, 90, 3, 150
 
-# Force a starter for the upcoming week: {"NYJ": "Taylor"} (substring of player_name)
-QB_OVERRIDES = {}
+# Force a starter for the upcoming week: {"TB": "Jalon Daniels"} (full or partial name).
+# A QB with no snaps this season gets rated replacement level (league avg minus the penalty).
+# Clear these out once the week is played.
+QB_OVERRIDES = {"TB": "Jalon Daniels"}
+REPLACEMENT_QB_PENALTY = 0.12   # EPA/play below league avg for a QB with no stats
 
 TZ = {  # hours west of ET, for travel
     **dict.fromkeys("BUF MIA NE NYJ BAL CIN CLE PIT IND JAX NYG PHI WAS ATL CAR TB DET".split(), 0),
@@ -359,14 +362,22 @@ def _add_qb(long, passing):
     long["qb_id"] = g.qb_id.ffill()
     long["qb_name"] = g.qb_name.ffill()
     unplayed = (long.played == 0) & (long.season == CURRENT_SEASON)
-    for team, needle in QB_OVERRIDES.items():
-        hit = q[q.player_name.str.contains(needle, case=False, na=False)]
-        if hit.empty:
-            print(f"  ! QB override '{needle}' for {team} not found in passing data")
-            continue
-        row = hit.sort_values(["season", "week"]).iloc[-1]
+    no_stats = pd.Series(False, index=long.index)
+    cur = q[q.season == CURRENT_SEASON]
+    for team, name in QB_OVERRIDES.items():
         m = unplayed & (long.team == team)
-        long.loc[m, "qb_id"], long.loc[m, "qb_name"] = row.player_id, row.player_name
+        if not m.any():
+            print(f"  ! QB override: no upcoming {CURRENT_SEASON} game for '{team}'")
+            continue
+        hit = cur[cur.player_name.str.contains(name, case=False, na=False)]
+        if hit.empty:   # hasn't played this year -> replacement-level QB
+            print(f"  QB override {team}: {name} (no {CURRENT_SEASON} stats, rated replacement level)")
+            long.loc[m, "qb_id"], long.loc[m, "qb_name"] = f"override_{team}_{name}", name
+            no_stats |= m
+        else:
+            row = hit.sort_values("week").iloc[-1]
+            print(f"  QB override {team}: {row.player_name}")
+            long.loc[m, "qb_id"], long.loc[m, "qb_name"] = row.player_id, row.player_name
 
     prev = long.groupby(["team", "season"], sort=False).qb_id.shift(1)
     long["qb_change"] = (prev.notna() & long.qb_id.notna() & (prev != long.qb_id)).astype(int)
@@ -387,6 +398,7 @@ def _add_qb(long, passing):
     long["cum_epa"] = lk.cum_epa.reindex(long.index).fillna(0)
     long["cum_att"] = lk.cum_att.reindex(long.index).fillna(0)
     long["qb_epa"] = (long.cum_epa + K_QB * mu) / (long.cum_att + K_QB)
+    long.loc[no_stats, "qb_epa"] = mu - REPLACEMENT_QB_PENALTY
     return long
 
 
