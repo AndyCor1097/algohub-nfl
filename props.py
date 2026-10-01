@@ -41,17 +41,31 @@ TD_MAX_PRICE = 700     # no TD picks longer than +700 (longshot noise, books are
 TD_HOLD = 1.20         # anytime-TD "Yes" prices carry ~20% hold
 POS_CODE = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
 
-STAT_MAP = {  # short name -> nflverse column
+STAT_MAP_V1 = {  # short name -> nflverse column
     "att": "attempts", "cmp": "completions", "pyd": "passing_yards", "ptd": "passing_tds",
     "car": "carries", "ryd": "rushing_yards", "rtd": "rushing_tds",
     "tgt": "targets", "rec": "receptions", "recyd": "receiving_yards", "rectd": "receiving_tds",
     "tsh": "target_share", "ayd": "receiving_air_yards",
 }
-PLAYER_FEATS = ["gp"] + [f"{s}_pg" for s in STAT_MAP] + ["tdany_pg", "l1_tgt", "l1_car", "l1_att", "pos_code"]
+STAT_MAP = {**STAT_MAP_V1, "ays": "air_yards_share", "wopr": "wopr"}
+PLAYER_FEATS = ["gp"] + [f"{s}_pg" for s in STAT_MAP_V1] + ["tdany_pg", "l1_tgt", "l1_car", "l1_att", "pos_code"]
 TEAM_FEATS = ["implied", "total_line", "team_spread", "is_home", "dome", "wind", "team_off_pass",
               "team_off_rush", "team_pace", "team_qb_epa", "opp_def_pass", "opp_def_rush"]
 OPP_FEATS = ["opp_pyd_allow", "opp_ryd_allow", "opp_recyd_allow_pos", "opp_rec_allow_pos", "opp_td_allow_pos"]
-FEATURES = PLAYER_FEATS + TEAM_FEATS + OPP_FEATS + ["week"]
+FEATURES_V1 = PLAYER_FEATS + TEAM_FEATS + OPP_FEATS + ["week"]
+# Props v2: usage (snap share, air yards share, WOPR, red-zone share), team pass rate, coverage
+V2_USAGE = ["ays_pg", "wopr_pg", "snap_pg", "l1_snap", "rz_tgt_pg", "rz_car_pg", "rz_tgt_sh", "rz_car_sh",
+            "team_pass_rate"]
+V2_COV = ["cov_ypt_man", "cov_ypt_zone", "cov_tg", "opp_man_prev", "cov_ratio"]
+V2_EXTRA = V2_USAGE + V2_COV
+# Holdout test (2021-25, each season unseen): coverage features improved rec yds MAE by only 0.03
+# on top of usage, and need ~260MB of extra downloads -> off in the model, still shown on cards.
+USE_COVERAGE_FEATURES = False
+FEATURES_V2 = FEATURES_V1 + V2_USAGE + (V2_COV if USE_COVERAGE_FEATURES else [])
+BINNED_CAL = {"pass_yds", "rush_yds", "rec_yds"}   # receptions calibrate better pooled (holdout test)
+USE_V2 = True
+FEATURES = FEATURES_V2 if USE_V2 else FEATURES_V1
+_V2 = None   # v2 side tables (team pass rate, coverage), set by load_stats
 
 
 # ----------------------------------------------------------------------------
@@ -74,6 +88,14 @@ def load_stats(refresh_current=False):
     st["any_td"] = ((st.rushing_tds + st.receiving_tds) > 0).astype(int)
     st["week"] = st.week.astype(int)
     st["name_key"] = st.player_display_name.map(name_key)
+    if USE_V2:
+        global _V2
+        import features_v2 as fv2
+        seasons = list(range(PROPS_FIRST_SEASON, nfl.CURRENT_SEASON + 1))
+        raw = fv2.load(seasons, refresh_current, coverage=USE_COVERAGE_FEATURES)
+        st = fv2.attach_player_week(st, raw)
+        cov_p, cov_d, lg_man = fv2.coverage_features(raw, seasons)
+        _V2 = dict(pass_rate=fv2.team_pass_rate(raw), cov_p=cov_p, cov_d=cov_d, lg_man=lg_man)
     return st
 
 
@@ -100,6 +122,17 @@ def _player_cum(st):
         out[f"{short}_pg"] = cum[col] / cum["one"]
     out["tdany_pg"] = cum["tdany"] / cum["one"]
     out["l1_tgt"], out["l1_car"], out["l1_att"] = p.targets, p.carries, p.attempts
+    if "snap_pct" in p.columns:   # v2 usage
+        g = p.groupby(["player_id", "season"])
+        n_snap = g.snap_pct.transform(lambda x: x.notna().cumsum())
+        s_snap = p.snap_pct.fillna(0).groupby([p.player_id, p.season]).cumsum()
+        out["snap_pg"] = (s_snap / n_snap.replace(0, np.nan)).values
+        out["l1_snap"] = p.snap_pct.values
+        c2 = g[["rz_tgt", "rz_car", "team_rz_tgt", "team_rz_car"]].cumsum()
+        out["rz_tgt_pg"] = c2.rz_tgt / cum["one"]
+        out["rz_car_pg"] = c2.rz_car / cum["one"]
+        out["rz_tgt_sh"] = c2.rz_tgt / c2.team_rz_tgt.replace(0, np.nan)
+        out["rz_car_sh"] = c2.rz_car / c2.team_rz_car.replace(0, np.nan)
     out = out.rename(columns={"position": "cur_pos", "team": "last_team"})
     return out
 
@@ -177,6 +210,23 @@ def build_rows(st, frame, rows):
     out = out.merge(ctx.drop(columns="opp"), on=["season", "week", "team"], how="left")
     out["pos_code"] = out.position.map(POS_CODE)
     out["gp"] = out.gp.fillna(0)
+    if _V2 is not None:
+        pr = _V2["pass_rate"]
+        if len(pr):
+            out = _asof(out, pr, ["team", "season"])
+        else:
+            out["team_pass_rate"] = np.nan
+        P, D, lg_man = _V2["cov_p"], _V2["cov_d"], _V2["lg_man"]
+        out = out.merge(P, on=["player_id", "season"], how="left") if len(P) else out.assign(
+            cov_ypt_man=np.nan, cov_ypt_zone=np.nan, cov_tg_man=np.nan, cov_tg_zone=np.nan)
+        out = out.merge(D, on=["opp", "season"], how="left") if len(D) else out.assign(opp_man_prev=np.nan)
+        out["cov_tg"] = out.cov_tg_man + out.cov_tg_zone
+        m = out.opp_man_prev
+        out["cov_ratio"] = (m * out.cov_ypt_man + (1 - m) * out.cov_ypt_zone) / (
+            lg_man * out.cov_ypt_man + (1 - lg_man) * out.cov_ypt_zone)
+    for c in V2_EXTRA:
+        if c not in out.columns:
+            out[c] = np.nan
     return out
 
 
@@ -217,7 +267,7 @@ def train(frame=None):
     frame = nfl.build_all() if frame is None else frame
     st = load_stats()
     df = training_rows(st, frame)
-    bundle = {"features": FEATURES, "models": {}, "z": {}}
+    bundle = {"features": FEATURES, "models": {}, "z": {}, "version": "v2" if USE_V2 else "v1"}
     kf = KFold(5, shuffle=True, random_state=7)
     print("props training")
     for mkt, (_, stat, label, _) in MARKETS.items():
@@ -235,6 +285,10 @@ def train(frame=None):
             # normalized residuals -> empirical distribution for over/under probs (handles skew)
             z = ((y - oof) / np.sqrt(np.clip(oof, 1, None))).to_numpy()
             bundle["z"][mkt] = np.sort(np.random.default_rng(7).choice(z, min(len(z), 20000), replace=False))
+            # skew differs by role (backups have lots of zeros, starters don't): one distribution per size bin
+            edges = np.quantile(oof, [0.2, 0.4, 0.6, 0.8])
+            bins = np.digitize(oof, edges)
+            bundle.setdefault("zbins", {})[mkt] = (edges, [np.sort(z[bins == b]) for b in range(5)])
             print(f"  {label:<11} n={len(d):>6,}  MAE {np.mean(np.abs(y - oof)):.2f}  (naive {np.mean(np.abs(y - y.mean())):.2f})")
         bundle["models"][mkt] = m
     joblib.dump(bundle, nfl.MODELS / "props_bundle.joblib")
@@ -243,6 +297,9 @@ def train(frame=None):
 
 def p_over(bundle, mkt, proj, line):
     z = bundle["z"][mkt]
+    if mkt in BINNED_CAL and "zbins" in bundle and mkt in bundle["zbins"]:
+        edges, zs = bundle["zbins"][mkt]
+        z = zs[int(np.digitize([proj], edges)[0])]
     thr = (line - proj) / np.sqrt(max(proj, 1))
     return 1 - np.searchsorted(z, thr, side="right") / len(z)
 
