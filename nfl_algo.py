@@ -392,7 +392,48 @@ def _add_qb(long, passing):
 
 def build_all():
     g, p, q = load_all()
+    for col in ("home_team", "away_team"):
+        g[col] = g[col].replace(TEAM_FIX)
+    for col in ("posteam", "defteam"):
+        p[col] = p[col].replace(TEAM_FIX)
+    if "recent_team" in q.columns:
+        q["recent_team"] = q.recent_team.replace(TEAM_FIX)
     return build_frame(g, p, q)
+
+
+# nfldata / ESPN use a few different codes than nflverse -> one canonical code
+TEAM_FIX = {"WSH": "WAS", "LAR": "LA", "JAC": "JAX"}
+ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+
+
+def _to_eastern(utc):
+    """UTC timestamp -> US Eastern (DST: 2nd Sun Mar 2am -> 1st Sun Nov 2am). No tz packages needed."""
+    y = utc.year
+    mar = pd.Timestamp(y, 3, 8) + pd.Timedelta(days=(6 - pd.Timestamp(y, 3, 8).weekday()) % 7)
+    nov = pd.Timestamp(y, 11, 1) + pd.Timedelta(days=(6 - pd.Timestamp(y, 11, 1).weekday()) % 7)
+    dst = (mar + pd.Timedelta(hours=7)) <= utc < (nov + pd.Timedelta(hours=6))
+    return utc - pd.Timedelta(hours=4 if dst else 5)
+
+
+def fetch_kickoffs(season, week):
+    """{(home, away): (gameday_ET, 'HH:MM' ET, venue)} from ESPN's free scoreboard."""
+    try:
+        r = requests.get(ESPN_SCOREBOARD, params=dict(dates=season, seasontype=2, week=week), timeout=20)
+        r.raise_for_status()
+        events = r.json().get("events", [])
+    except (requests.RequestException, ValueError) as ex:
+        print(f"  ! couldn't get kickoff times from ESPN ({ex})", flush=True)
+        return {}
+    out = {}
+    for ev in events:
+        comp = (ev.get("competitions") or [{}])[0]
+        teams = {c.get("homeAway"): c.get("team", {}).get("abbreviation") for c in comp.get("competitors", [])}
+        h, a = (TEAM_FIX.get(teams.get(k), teams.get(k)) for k in ("home", "away"))
+        if not (h and a and ev.get("date")):
+            continue
+        et = _to_eastern(pd.Timestamp(ev["date"]).tz_localize(None))
+        out[(h, a)] = (str(et.date()), et.strftime("%H:%M"), comp.get("venue", {}).get("fullName"))
+    return out
 
 
 def trainable(df):
@@ -544,6 +585,18 @@ def predict(week, season=CURRENT_SEASON, refresh=True):
     wk = df[(df.season == season) & (df.week == week)].copy()
     if wk.empty:
         sys.exit(f"no games found for {season} week {week}")
+
+    kicks = fetch_kickoffs(season, week)
+    wk["gametime"] = wk.gametime.astype(object)
+    wk["stadium"] = wk.stadium.astype(object)
+    for i, r in wk.iterrows():
+        k = kicks.get((r.home_team, r.away_team))
+        if k:
+            wk.at[i, "gameday"], wk.at[i, "gametime"] = pd.Timestamp(k[0]), k[1]
+            if k[2]:
+                wk.at[i, "stadium"] = k[2]
+    if kicks:
+        print(f"  kickoff times (ET) from ESPN for {sum((r.home_team, r.away_team) in kicks for _, r in wk.iterrows())}/{len(wk)} games")
 
     X = wk[bundle["features"]]
     wk["pred_margin"] = bundle["margin"].predict(X)
