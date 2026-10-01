@@ -17,6 +17,7 @@ Usage:
   python nfl_algo.py grade --week 4      # grade a finished week into tracker.csv
 """
 import argparse
+import io
 import os
 import sys
 import time
@@ -46,18 +47,20 @@ DATA, MODELS, PICKS, CARDS = (ROOT / d for d in ("data", "models", "picks", "car
 TRACKER = ROOT / "tracker.csv"
 
 # Edge thresholds (points). Below the lowest = NO PLAY.
-SPREAD_TIERS = [(4.5, "HAMMER"), (3.0, "PLAY"), (2.0, "LEAN")]
+SPREAD_TIERS = [(6.0, "HAMMER"), (4.5, "PLAY"), (3.0, "LEAN")]  # sides are sharp: only fire on big gaps
 TOTAL_TIERS = [(6.0, "HAMMER"), (4.0, "PLAY"), (2.5, "LEAN")]
 ML_EDGE = 0.04               # model win prob minus no-vig implied prob
 
 # Shrinkage strength (in plays / games). Bigger = pulls harder toward league avg.
 K_PLAYS, K_PASS, K_RUSH, K_GAMES, K_QB = 170, 110, 90, 3, 150
 
-# Force a starter for the upcoming week: {"TB": "Jalon Daniels"} (full or partial name).
+# Starting QBs come from the nflverse schedule automatically (it updates during the week).
+# Use this only to force someone the schedule doesn't have yet: {"TB": "Jalon Daniels"}.
 # A QB with no snaps this season gets rated replacement level (league avg minus the penalty).
-# Clear these out once the week is played.
-QB_OVERRIDES = {"TB": "Jalon Daniels"}
+QB_OVERRIDES = {}
 REPLACEMENT_QB_PENALTY = 0.12   # EPA/play below league avg for a QB with no stats
+QB_ACTIVE = dict(QB_OVERRIDES)  # schedule starters + manual overrides, filled in by predict()
+LAST_FRAME = None               # game frame from the last build_all(), reused by props
 
 TZ = {  # hours west of ET, for travel
     **dict.fromkeys("BUF MIA NE NYJ BAL CIN CLE PIT IND JAX NYG PHI WAS ATL CAR TB DET".split(), 0),
@@ -166,12 +169,45 @@ def load_plays(season, refresh=False):
 def load_passing(season, refresh=False):
     def fetch():
         df = fetch_all("/stats/passing", {"season": season}, 1000)
+        if df.empty:   # nfldata's box scores stop at 2024 -> nflverse weekly player stats
+            ps = load_player_week(season, refresh)
+            if not ps.empty:
+                ps = ps[pd.to_numeric(ps.attempts, errors="coerce").fillna(0) > 0]
+                df = pd.DataFrame({"player_id": ps.player_id, "player_name": ps.player_display_name,
+                                   "recent_team": ps.team, "season": ps.season, "week": ps.week,
+                                   "season_type": ps.season_type, "attempts": ps.attempts,
+                                   "passing_epa": ps.passing_epa})
+                print(f"  passing_{season}: using nflverse player stats", flush=True)
         if df.empty:
             df = load_qbr_week(season)
             if not df.empty:
-                print(f"  passing_{season}: no box-score passing yet, using weekly QBR instead", flush=True)
+                print(f"  passing_{season}: using weekly QBR", flush=True)
         return df
     return _cached(f"passing_{season}", fetch, refresh)
+
+
+NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
+
+
+def _nflverse_csv(path):
+    try:
+        r = requests.get(f"{NFLVERSE}/{path}", timeout=120)
+        if r.status_code != 200:
+            return pd.DataFrame()
+        return pd.read_csv(io.BytesIO(r.content), low_memory=False)
+    except (requests.RequestException, pd.errors.ParserError, pd.errors.EmptyDataError) as ex:
+        print(f"  ! nflverse {path}: {ex}", flush=True)
+        return pd.DataFrame()
+
+
+def load_player_week(season, refresh=False):
+    return _cached(f"pstats_{season}",
+                   lambda: _nflverse_csv(f"stats_player/stats_player_week_{season}.csv"), refresh)
+
+
+def load_schedule(refresh=False):
+    """nflverse schedule: kickoff times (ET) + projected starting QBs, updated through the week."""
+    return _cached("schedule", lambda: _nflverse_csv("schedules/games.csv"), refresh)
 
 
 ESPN_ABBR = {"WSH": "WAS", "LAR": "LA", "JAC": "JAX", "LV": "LV", "OAK": "LV"}
@@ -206,6 +242,11 @@ def update(refresh_current=True):
         load_games(s, refresh)
         load_plays(s, refresh)
         load_passing(s, refresh)
+    import props
+    print("player stats (props)", flush=True)
+    for s in range(props.PROPS_FIRST_SEASON, CURRENT_SEASON + 1):
+        load_player_week(s, refresh_current and s == CURRENT_SEASON)
+    load_schedule(refresh_current)
 
 
 def load_all():
@@ -364,19 +405,21 @@ def _add_qb(long, passing):
     unplayed = (long.played == 0) & (long.season == CURRENT_SEASON)
     no_stats = pd.Series(False, index=long.index)
     cur = q[q.season == CURRENT_SEASON]
-    for team, name in QB_OVERRIDES.items():
+    for team, name in QB_ACTIVE.items():
         m = unplayed & (long.team == team)
-        if not m.any():
-            print(f"  ! QB override: no upcoming {CURRENT_SEASON} game for '{team}'")
+        if not m.any() or not isinstance(name, str) or not name.strip():
             continue
-        hit = cur[cur.player_name.str.contains(name, case=False, na=False)]
+        now = long.loc[m, "qb_name"].dropna()
+        if len(now) and now.iloc[0].lower() == name.lower():
+            continue   # already the guy
+        hit = cur[cur.player_name.str.contains(name, case=False, na=False, regex=False)]
         if hit.empty:   # hasn't played this year -> replacement-level QB
-            print(f"  QB override {team}: {name} (no {CURRENT_SEASON} stats, rated replacement level)")
+            print(f"  QB {team}: {name} starting (no {CURRENT_SEASON} stats, rated replacement level)")
             long.loc[m, "qb_id"], long.loc[m, "qb_name"] = f"override_{team}_{name}", name
             no_stats |= m
         else:
             row = hit.sort_values("week").iloc[-1]
-            print(f"  QB override {team}: {row.player_name}")
+            print(f"  QB {team}: {row.player_name} starting")
             long.loc[m, "qb_id"], long.loc[m, "qb_name"] = row.player_id, row.player_name
 
     prev = long.groupby(["team", "season"], sort=False).qb_id.shift(1)
@@ -410,7 +453,9 @@ def build_all():
         p[col] = p[col].replace(TEAM_FIX)
     if "recent_team" in q.columns:
         q["recent_team"] = q.recent_team.replace(TEAM_FIX)
-    return build_frame(g, p, q)
+    global LAST_FRAME
+    LAST_FRAME = build_frame(g, p, q)
+    return LAST_FRAME
 
 
 # nfldata / ESPN use a few different codes than nflverse -> one canonical code
@@ -456,9 +501,11 @@ def trainable(df):
 # MODEL
 # ----------------------------------------------------------------------------
 def make_model():
+    # conservative on purpose: early-season samples are tiny and a looser model chases noise
+    # (on a 2025 holdout this cut fake 10+ pt edges and gave the best totals accuracy)
     return HistGradientBoostingRegressor(
-        learning_rate=0.03, max_iter=500, max_leaf_nodes=15, min_samples_leaf=50,
-        l2_regularization=1.0, early_stopping=False, random_state=7)
+        learning_rate=0.03, max_iter=150, max_depth=3, min_samples_leaf=100,
+        l2_regularization=5.0, early_stopping=False, random_state=7)
 
 
 def fit(tr):
@@ -469,7 +516,8 @@ def fit(tr):
 
 
 def train():
-    df = trainable(build_all())
+    frame = build_all()
+    df = trainable(frame)
     print(f"training on {len(df):,} games ({df.season.min()}-{df.season.max()})")
     mm, mt = fit(df)
     kf = KFold(5, shuffle=True, random_state=7)
@@ -482,6 +530,11 @@ def train():
                      n=len(df)), MODELS / "nfl_bundle.joblib")
     print(f"saved models/nfl_bundle.joblib | CV MAE margin {np.mean(np.abs(df.margin - oof_m)):.2f} "
           f"total {np.mean(np.abs(df.total - oof_t)):.2f} | sigma margin {sig_m:.2f}")
+    import props
+    try:
+        props.train(frame)
+    except Exception as ex:
+        print(f"  ! props model not trained: {type(ex).__name__}: {ex}")
 
 
 def _ats(edge, res, thr):
@@ -535,8 +588,17 @@ def am_to_dec(o):
     return 1 + (o / 100 if o > 0 else 100 / -o)
 
 
+def odds_key():
+    """Odds API key: env var ODDS_API_KEY, else odds_api_key.txt in this folder (gitignored)."""
+    k = os.environ.get("ODDS_API_KEY", "").strip()
+    f = ROOT / "odds_api_key.txt"
+    if not k and f.exists():
+        k = f.read_text(encoding="utf-8").strip()
+    return k or None
+
+
 def fetch_odds():
-    key = os.environ.get("ODDS_API_KEY")
+    key = odds_key()
     if not key:
         return {}
     r = requests.get(ODDS_URL, params=dict(apiKey=key, regions="us", oddsFormat="american",
@@ -588,27 +650,49 @@ def side_line(team, pts):
     return f"{team} PK" if abs(pts) < 0.05 else f"{team} {pts:+.1f}"
 
 
-def predict(week, season=CURRENT_SEASON, refresh=True):
+def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     if refresh:
         print(f"refreshing {season} data...")
         load_games(season, True); load_plays(season, True); load_passing(season, True)
+        load_player_week(season, True); load_schedule(True)
     bundle = joblib.load(MODELS / "nfl_bundle.joblib")
+
+    # schedule: ET kickoff times + projected starting QBs (manual QB_OVERRIDES win)
+    sched = load_schedule()
+    sw = sched[(sched.get("season") == season) & (sched.get("week") == week)].copy() if not sched.empty else sched
+    starters = {}
+    if not sw.empty:
+        for c in ("home_team", "away_team"):
+            sw[c] = sw[c].replace(TEAM_FIX)
+        for _, s in sw.iterrows():
+            for side in ("home", "away"):
+                n = s.get(f"{side}_qb_name")
+                if isinstance(n, str) and n.strip():
+                    starters[s[f"{side}_team"]] = n.strip()
+    global QB_ACTIVE
+    QB_ACTIVE = {**starters, **QB_OVERRIDES}
+
     df = build_all()
     wk = df[(df.season == season) & (df.week == week)].copy()
     if wk.empty:
         sys.exit(f"no games found for {season} week {week}")
 
-    kicks = fetch_kickoffs(season, week)
     wk["gametime"] = wk.gametime.astype(object)
     wk["stadium"] = wk.stadium.astype(object)
+    sk = {}
+    if not sw.empty:
+        for _, s in sw.iterrows():
+            if isinstance(s.get("gametime"), str):
+                sk[(s.home_team, s.away_team)] = (s.gameday, s.gametime[:5], s.get("stadium"))
+    missing = [(r.home_team, r.away_team) for _, r in wk.iterrows() if (r.home_team, r.away_team) not in sk]
+    kicks = {**fetch_kickoffs(season, week), **sk} if missing else sk
     for i, r in wk.iterrows():
         k = kicks.get((r.home_team, r.away_team))
         if k:
             wk.at[i, "gameday"], wk.at[i, "gametime"] = pd.Timestamp(k[0]), k[1]
-            if k[2]:
+            if isinstance(k[2], str) and k[2]:
                 wk.at[i, "stadium"] = k[2]
-    if kicks:
-        print(f"  kickoff times (ET) from ESPN for {sum((r.home_team, r.away_team) in kicks for _, r in wk.iterrows())}/{len(wk)} games")
+    print(f"  kickoff times (ET) for {sum((r.home_team, r.away_team) in kicks for _, r in wk.iterrows())}/{len(wk)} games")
 
     X = wk[bundle["features"]]
     wk["pred_margin"] = bundle["margin"].predict(X)
@@ -674,9 +758,24 @@ def predict(week, season=CURRENT_SEASON, refresh=True):
     tag = f"{season}_wk{week:02d}"
     out[keep].to_csv(PICKS / f"{tag}.csv", index=False)
 
+    pr = None
+    if (MODELS / "props_bundle.joblib").exists():
+        import props
+        print("props...")
+        try:
+            pr = props.predict(wk, season, week, QB_ACTIVE, refresh_lines=refresh_lines)
+            pr.to_csv(PICKS / f"props_{tag}.csv", index=False)
+            n_pk = int((pr.tier.fillna("") != "").sum()) if len(pr) else 0
+            print(f"  {len(pr)} player props, {n_pk} plays -> picks/props_{tag}.csv")
+        except Exception as ex:  # props should never take down the game card run
+            print(f"  ! props skipped: {type(ex).__name__}: {ex}")
+            pr = None
+    else:
+        print("  (no props model yet: run `python nfl_algo.py train` to build it)")
+
     from cards import render_cards
     html_path = CARDS / f"{tag}.html"
-    html_path.write_text(render_cards(out, season, week), encoding="utf-8")
+    html_path.write_text(render_cards(out, season, week, pr), encoding="utf-8")
 
     print(f"\n{season} WEEK {week}  ({len(out)} games)\n")
     for _, r in out.iterrows():
@@ -704,7 +803,7 @@ def _flags(r):
         f.append(f"WIND {int(r.wind)}")
     if r.temp <= 32 and not r.dome:
         f.append(f"{int(r.temp)}°F")
-    if r.div:
+    if r["div"]:
         f.append("DIVISION")
     if r.tz_travel >= 3 and not r.is_intl:
         f.append(f"{r.away_team} CROSS-COUNTRY")
@@ -746,11 +845,13 @@ def grade(week, season=CURRENT_SEASON):
             rows.append({**base, "market": "ML", "tier": "VALUE",
                          "pick": f"{r.ml_pick} {int(r.ml_odds):+d}", "edge": round(r.ml_edge, 3),
                          "result": o, "units": _units(o, r.ml_odds)})
+    import props
+    rows += props.grade(season, week)
     if not rows:
         sys.exit("nothing to grade yet (no finished games with plays)")
     new = pd.DataFrame(rows)
     tr = pd.concat([pd.read_csv(TRACKER), new]) if TRACKER.exists() else new
-    tr = tr.drop_duplicates(["game_id", "market"], keep="last")
+    tr = tr.drop_duplicates(["game_id", "market", "pick"], keep="last")
     tr.to_csv(TRACKER, index=False)
     print(new[["matchup", "score", "market", "tier", "pick", "result", "units"]].to_string(index=False))
     tracker_summary(tr)
@@ -762,9 +863,9 @@ def tracker_summary(tr=None):
     for (mkt, tr_), g in tr.groupby(["market", "tier"]):
         w, l, p = (g.result == "W").sum(), (g.result == "L").sum(), (g.result == "P").sum()
         u = g.units.sum()
-        print(f"  {mkt:<7}{tr_:<7} {w}-{l}-{p}  {w / max(w + l, 1):.1%}  {u:+.2f}u  ROI {u / max(w + l, 1):+.1%}")
+        print(f"  {mkt:<20}{tr_:<7} {w}-{l}-{p}  {w / max(w + l, 1):.1%}  {u:+.2f}u  ROI {u / max(w + l, 1):+.1%}")
     u = tr.units.sum()
-    print(f"  ALL            {u:+.2f}u over {len(tr)} plays")
+    print(f"  {'ALL':<27} {u:+.2f}u over {len(tr)} plays")
 
 
 # ----------------------------------------------------------------------------
@@ -781,6 +882,8 @@ if __name__ == "__main__":
         p.add_argument("--season", type=int, default=CURRENT_SEASON)
         if name == "predict":
             p.add_argument("--no-refresh", action="store_true")
+            p.add_argument("--refresh-lines", action="store_true",
+                           help="re-pull prop lines from the Odds API (costs credits)")
     a = ap.parse_args()
     if a.cmd == "update":
         update()
@@ -791,6 +894,6 @@ if __name__ == "__main__":
     elif a.cmd == "record":
         tracker_summary()
     elif a.cmd == "predict":
-        predict(a.week, a.season, refresh=not a.no_refresh)
+        predict(a.week, a.season, refresh=not a.no_refresh, refresh_lines=a.refresh_lines)
     elif a.cmd == "grade":
         grade(a.week, a.season)
