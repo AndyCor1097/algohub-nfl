@@ -327,9 +327,9 @@ def candidates(st, wk, starters):
     return c
 
 
-def predict(wk, season, week, starters, refresh_lines=False, injuries=None):
+def predict(wk, season, week, starters, refresh_lines=False, injuries=None, frame=None):
     bundle = joblib.load(nfl.MODELS / "props_bundle.joblib")
-    frame = nfl.LAST_FRAME
+    frame = nfl.LAST_FRAME if frame is None else frame
     st = load_stats()
     cand = candidates(st, wk, starters)
     injuries = injuries or {}

@@ -10,6 +10,21 @@ python nfl_algo.py backtest    # walk-forward 2018 -> 2025, ATS / O-U record by 
 python nfl_algo.py train       # fits models/nfl_bundle.joblib
 ```
 
+## Autopilot
+`python nfl_algo.py auto` does the whole week: grades last week, retrains (weekly), makes this
+week's picks + props + cards + post graphics, and pushes to GitHub (site updates itself).
+- Double-click `run_algo.bat` to run it now (log in `logs/auto.log`)
+- Double-click `schedule_tasks.bat` once to run it every Fri 5 PM, Sun 10:30 AM, Tue 10 AM
+  (PC has to be on and logged in)
+
+## Matchup Intel
+On every card: each defense's man coverage %, most-used shell, pressure % (2025) and blitz % (2026).
+On receiving props: player's yards/target vs MAN and vs ZONE, and COV ✓/✗ when this defense's
+coverage mix helps/hurts him. Info only, not in the model yet (not enough seasons to validate).
+
+## Post graphics
+`predict` writes `posts/*_plays.png`, `*_props.png`, `*_tds.png`. Also on the site's Posts tab.
+
 ## Weekly
 ```
 python nfl_algo.py predict --week 5   # picks/2026_wk05.csv + cards/2026_wk05.html
@@ -32,6 +47,19 @@ share.streamlit.io -> New app -> pick the repo -> main file `app.py`.
 
 Weekly loop: `predict` locally -> `git add picks tracker.csv` -> `git commit` -> `git push`.
 Site updates on its own.
+
+## Player props
+Built automatically by `train` / `predict`. Tap **PLAYER PROPS** on any game card to open them.
+- Markets: pass yds, rush yds, rec yds, receptions, anytime TD
+- Stats: nflverse weekly player stats (free, pulled from GitHub, includes 2025 + 2026)
+- Lines: Odds API player props. Pulled once per week and cached in `data/` so reruns are free.
+  Re-pull fresh lines (costs credits, ~5 per game): `python nfl_algo.py predict --week 4 --refresh-lines`
+- No `ODDS_API_KEY` = projections only, no picks
+- Graded with `grade` like everything else (DNP = push)
+
+## Starting QBs
+Pulled from the nflverse schedule automatically. Only use `QB_OVERRIDES` at the top of
+`nfl_algo.py` if the schedule hasn't caught up to news yet.
 
 ## Live lines + moneyline (optional)
 Set `ODDS_API_KEY` as an environment variable and `predict` swaps in live consensus

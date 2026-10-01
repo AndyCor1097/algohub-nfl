@@ -104,7 +104,14 @@ def _strip(r):
           <div class="srow"><span class="slab">{e(t)} {kind.upper()} O <em>vs</em> {e(ot)} D</span>
             <span class="sbar"><i class="{cls}" style="width:{w:.1f}%"></i></span>
             <span class="sval {cls}">{v:+.2f}</span></div>""")
-    return f'<div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>{"".join(rows)}</div>'
+    dl = ""
+    for s, team in (("a", r["away_team"]), ("h", r["home_team"])):
+        line = _s(r.get(f"{s}_dline"))
+        if line:
+            dl += f'<div class="dline"><b>{e(team)} D</b><span>{e(line)}</span></div>'
+    if dl:
+        dl = f'<div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div>{dl}'
+    return f'<div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>{"".join(rows)}{dl}</div>'
 
 
 MKT_SHORT = {"pass_yds": "PASS", "rush_yds": "RUSH", "rec_yds": "REC YDS", "receptions": "REC", "atd": "TD"}
@@ -126,6 +133,14 @@ def _prop_row(p):
             bits.append(("HIT", p["hits"]))
         if tier_:
             bits.append(("EDGE", f'+{p["edge"] * 100:.0f}%'))
+    cov = ""
+    if not pd.isna(p.get("cov_edge")):
+        bits.append(("vs MAN", f'{p["ypt_man"]:.1f}'))
+        bits.append(("ZONE", f'{p["ypt_zone"]:.1f}'))
+        mark = _s(p.get("cov_mark"))
+        cls = "ok" if mark == "✓" else "bad" if mark == "✗" else ""
+        pct = int(round(p["cov_edge"] * 100))
+        cov = f'<span class="cov {cls}">COV {mark + " " if mark else ""}{f"{pct:+d}%" if pct else "0%"}</span>'
         right = (f'<span class="ptier t-{tier_.lower()}"><i>{e(tier_)}</i>'
                  f'{e("YES" if is_td else p["pick"])} <small>{e(_odds(p.get("price")))}</small></span>'
                  if tier_ else '<span class="pnone">NO PLAY</span>')
@@ -136,7 +151,7 @@ def _prop_row(p):
           <div class="prow" data-m="{e(p['market'])}" data-play="{1 if tier_ else 0}">
             <div class="pl"><b>{e(p['player'])}</b>{' <span class="q">Q</span>' if _s(p.get('inj')) == 'Questionable' else ''} <small>{e(p['position'])} · {e(p['team'])}</small></div>
             {right}
-            <div class="pm"><span class="mk">{e(p['label'].upper())}</span>{"".join(f'<span>{k} <b>{e(v)}</b></span>' for k, v in bits)}</div>
+            <div class="pm"><span class="mk">{e(p['label'].upper())}</span>{"".join(f'<span>{k} <b>{e(v)}</b></span>' for k, v in bits)}{cov}</div>
           </div>"""
 
 
@@ -298,6 +313,10 @@ background:#0f1319;color:var(--tx);padding:13px 16px;font:700 11px Inter,system-
 .pnone{{flex:none;color:#4b535d;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.14em}}
 .q{{font:800 9px Inter,system-ui,sans-serif;color:#0b0e13;background:var(--ham);padding:2px 4px;border-radius:4px;vertical-align:2px}}
 .chip.inj{{color:#ffb4ab;border-color:#5a2a27;background:#1d1212}}
+.dlab{{margin-top:12px}} .dline{{display:flex;gap:10px;font-size:12px;padding:3px 0;align-items:baseline}}
+.dline b{{flex:none;width:52px;font-weight:600}} .dline span{{color:#c9d1d9;font:600 13px "Barlow Condensed",sans-serif;letter-spacing:.04em}}
+.cov{{font:700 10px Inter,system-ui,sans-serif;letter-spacing:.08em;padding:1px 6px;border-radius:5px;border:1px solid var(--line);color:#c9d1d9}}
+.cov.ok{{color:var(--play);border-color:#1f4d2b;background:#0f1d14}} .cov.bad{{color:var(--neg);border-color:#5a2a27;background:#1d1212}}
 .pproj{{flex:none;font:700 18px "Barlow Condensed",sans-serif;color:var(--mu)}}
 .foot{{color:var(--mu);font-size:11px;margin-top:30px;letter-spacing:.06em}}
 .hide,.prow[data-hide="1"]{{display:none}}

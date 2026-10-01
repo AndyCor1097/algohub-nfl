@@ -43,7 +43,7 @@ picks = read(opts[choice])
 season, week = int(picks.season.iloc[0]), int(picks.week.iloc[0])
 props = read(PICKS / f"props_{season}_wk{week:02d}.csv")
 
-t_cards, t_bets, t_record, t_bt = st.tabs(["Cards", "Best Bets", "Record", "Backtest"])
+t_cards, t_bets, t_posts, t_record, t_bt = st.tabs(["Cards", "Best Bets", "Posts", "Record", "Backtest"])
 
 # --- cards ------------------------------------------------------------------
 with t_cards:
@@ -88,6 +88,20 @@ with t_bets:
         st.caption("Edge = points vs. Vegas for spreads/totals; % over no-vig implied for ML and props.")
     else:
         st.info("No plays clear the thresholds this week.")
+
+# --- posts ------------------------------------------------------------------
+with t_posts:
+    imgs = sorted((ROOT / "posts").glob(f"{season}_wk{week:02d}_*.png"))
+    if not imgs:
+        st.info("No post graphics for this week yet. They're made automatically by `predict`.")
+    else:
+        st.caption("Ready to post. Tap download, or long-press the image on your phone to save.")
+        cols = st.columns(min(len(imgs), 3))
+        for i, f in enumerate(imgs):
+            with cols[i % len(cols)]:
+                st.image(str(f), use_container_width=True)
+                st.download_button(f"Download {f.stem.split('_')[-1]}", f.read_bytes(), file_name=f.name,
+                                   mime="image/png", key=f.name, use_container_width=True)
 
 # --- record -----------------------------------------------------------------
 with t_record:

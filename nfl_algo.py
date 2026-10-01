@@ -31,6 +31,11 @@ from scipy.stats import norm
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import KFold, cross_val_predict
 
+# when run as `python nfl_algo.py`, make `import nfl_algo` (in props/intel) return THIS module,
+# not a second fresh copy with empty state
+if __name__ == "__main__":
+    sys.modules.setdefault("nfl_algo", sys.modules[__name__])
+
 # ----------------------------------------------------------------------------
 # CONFIG
 # ----------------------------------------------------------------------------
@@ -143,8 +148,16 @@ def _cached(name, fetch, refresh):
             return pd.read_csv(f, low_memory=False)
         except pd.errors.EmptyDataError:
             f.unlink()                      # old blank file -> refetch
-    df = fetch()
+    try:
+        df = fetch()
+    except (requests.RequestException, OSError, RuntimeError) as ex:
+        if f.exists():   # source down -> keep going on the last good copy
+            print(f"  ! {name}: couldn't refresh ({type(ex).__name__}), using saved copy", flush=True)
+            return pd.read_csv(f, low_memory=False)
+        raise
     if df.empty:
+        if refresh and f.exists():
+            return pd.read_csv(f, low_memory=False)
         print(f"  ! {name}: API returned 0 rows (not cached, will retry next run)", flush=True)
         return df
     DATA.mkdir(exist_ok=True)
@@ -783,6 +796,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
                     wk.at[i, k] = v
             wk.at[i, "line_src"] = "odds_api"
 
+    use = _usage(week) if inj else {}
     rows = []
     for _, r in wk.sort_values(["gameday", "gametime"]).iterrows():
         h, a = r.home_team, r.away_team
@@ -815,18 +829,24 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
                 d.update(ml_pick=h if home_side else a,
                          ml_odds=r.ml_home if home_side else r.ml_away,
                          ml_edge=eh if home_side else ea)
-        d["flags"] = "|".join(_flags(r) + _injury_flags(r, inj, qb_notes, week))
+        d["flags"] = "|".join(_flags(r) + _injury_flags(r, inj, qb_notes, use))
         rows.append(d)
 
     out = pd.DataFrame(rows)
     PICKS.mkdir(exist_ok=True); CARDS.mkdir(exist_ok=True)
+
+    import intel as intel_mod
+    intel = intel_mod.load(refresh_live=refresh)
+    # defense intel shown on each side: a_dline = AWAY team's defense (what the home offense faces)
+    out["a_dline"] = out.away_team.map(lambda t: intel_mod.defense_line(intel, t))
+    out["h_dline"] = out.home_team.map(lambda t: intel_mod.defense_line(intel, t))
     keep = ["game_id", "season", "week", "gameday", "gametime", "stadium", "away_team", "home_team",
             "a_rec", "h_rec", "a_qb_name", "h_qb_name", "proj_away", "proj_home", "pred_margin",
             "pred_total", "home_wp", "spread_line", "total_line", "ml_home", "ml_away", "line_src",
             "model_line", "market_line", "sp_edge", "sp_tier", "sp_side", "sp_pick",
             "tot_edge", "tot_tier", "tot_pick", "ml_pick", "ml_odds", "ml_edge", "flags",
             "a_off_epa", "a_def_epa", "h_off_epa", "h_def_epa",
-            "a_pass_mu", "a_rush_mu", "h_pass_mu", "h_rush_mu"]
+            "a_pass_mu", "a_rush_mu", "h_pass_mu", "h_rush_mu", "a_dline", "h_dline"]
     tag = f"{season}_wk{week:02d}"
     out[keep].to_csv(PICKS / f"{tag}.csv", index=False)
 
@@ -837,7 +857,8 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
         try:
             qbs = {**dict(zip(wk.home_team, wk.h_qb_name)), **dict(zip(wk.away_team, wk.a_qb_name))}
             qbs = {t: n for t, n in qbs.items() if isinstance(n, str)}
-            pr = props.predict(wk, season, week, qbs, refresh_lines=refresh_lines, injuries=inj)
+            pr = props.predict(wk, season, week, qbs, refresh_lines=refresh_lines, injuries=inj, frame=df)
+            pr = intel_mod.annotate_props(pr, intel)
             pr.to_csv(PICKS / f"props_{tag}.csv", index=False)
             n_pk = int((pr.tier.fillna("") != "").sum()) if len(pr) else 0
             print(f"  {len(pr)} player props, {n_pk} plays -> picks/props_{tag}.csv")
@@ -850,6 +871,12 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     from cards import render_cards
     html_path = CARDS / f"{tag}.html"
     html_path.write_text(render_cards(out, season, week, pr), encoding="utf-8")
+    try:
+        import posts
+        made = posts.make_posts(out, pr, season, week, ROOT / "posts")
+        print(f"  post graphics -> {', '.join('posts/' + f.name for f in made)}")
+    except Exception as ex:
+        print(f"  ! post graphics skipped: {type(ex).__name__}: {ex}")
 
     print(f"\n{season} WEEK {week}  ({len(out)} games)\n")
     for _, r in out.iterrows():
@@ -860,16 +887,20 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     print(f"\npicks -> {PICKS / (tag + '.csv')}\ncards -> {html_path}")
 
 
-def _injury_flags(r, inj, qb_notes, week):
+def _usage(week):
+    """Avg (targets + carries + attempts) per game this season, by player_id."""
+    ps = load_player_week(CURRENT_SEASON)
+    if ps.empty:
+        return {}
+    ps = ps[ps.week < week]
+    t = ps.targets.fillna(0) + ps.carries.fillna(0) + ps.attempts.fillna(0)
+    return t.groupby(ps.player_id).mean().to_dict()
+
+
+def _injury_flags(r, inj, qb_notes, use):
     """OUT / Q chips for skill players who actually get usage this season."""
     if not inj:
         return []
-    ps = load_player_week(CURRENT_SEASON)
-    use = {}
-    if not ps.empty:
-        ps = ps[ps.week < week]
-        u = ps.assign(t=ps.targets.fillna(0) + ps.carries.fillna(0) + ps.attempts.fillna(0)).groupby("player_id").t.mean()
-        use = u.to_dict()
     out = []
     for team in (r.away_team, r.home_team):
         if team in qb_notes and team not in QB_OVERRIDES:
@@ -966,6 +997,59 @@ def tracker_summary(tr=None):
 
 
 # ----------------------------------------------------------------------------
+# AUTO: one command for the whole week (what the scheduled task runs)
+# ----------------------------------------------------------------------------
+def current_week(season=CURRENT_SEASON):
+    g = load_games(season, refresh=True)
+    open_games = g[g.home_score.isna()]
+    if open_games.empty:
+        return None
+    return int(open_games.week.min())
+
+
+def auto(push=True):
+    import subprocess
+    from datetime import datetime
+    print(f"\n===== AUTO RUN {datetime.now():%Y-%m-%d %H:%M} =====")
+    week = current_week()
+    if week is None:
+        print("season's over, nothing to do")
+        return
+    print(f"current week: {week}")
+
+    # 1) grade last week if it's done
+    if week > 1 and (PICKS / f"{CURRENT_SEASON}_wk{week - 1:02d}.csv").exists():
+        try:
+            grade(week - 1)
+        except SystemExit as ex:
+            print(f"  grade: {ex}")
+
+    # 2) retrain once a week
+    bundle = MODELS / "nfl_bundle.joblib"
+    if not bundle.exists() or time.time() - bundle.stat().st_mtime > 5 * 86400:
+        print("retraining (weekly)...")
+        load_games(CURRENT_SEASON, True); load_plays(CURRENT_SEASON, True); load_passing(CURRENT_SEASON, True)
+        load_player_week(CURRENT_SEASON, True)
+        train()
+
+    # 3) picks, props, cards, posts
+    predict(week, refresh=True)
+
+    # 4) push to GitHub -> site updates
+    if push:
+        def git(*a):
+            r = subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True)
+            return r.returncode, (r.stdout + r.stderr).strip()
+        git("add", "-A")
+        code, msg = git("commit", "-m", f"auto: week {week} {datetime.now():%a %H:%M}")
+        if "nothing to commit" in msg:
+            print("git: no changes")
+            return
+        code, msg = git("push")
+        print("git push: " + ("done, site will update in ~1 min" if code == 0 else f"FAILED\n{msg}"))
+
+
+# ----------------------------------------------------------------------------
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="AlgoHub NFL game algo")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -973,6 +1057,8 @@ if __name__ == "__main__":
     sub.add_parser("train")
     sub.add_parser("backtest")
     sub.add_parser("record")
+    pa = sub.add_parser("auto", help="grade last week, retrain weekly, predict this week, push")
+    pa.add_argument("--no-push", action="store_true")
     for name in ("predict", "grade"):
         p = sub.add_parser(name)
         p.add_argument("--week", type=int, required=True)
@@ -990,6 +1076,8 @@ if __name__ == "__main__":
         backtest()
     elif a.cmd == "record":
         tracker_summary()
+    elif a.cmd == "auto":
+        auto(push=not a.no_push)
     elif a.cmd == "predict":
         predict(a.week, a.season, refresh=not a.no_refresh, refresh_lines=a.refresh_lines)
     elif a.cmd == "grade":
