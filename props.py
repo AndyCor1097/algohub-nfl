@@ -33,7 +33,7 @@ MARKETS = {
 API_TO_MKT = {v[0]: k for k, v in MARKETS.items()}
 
 # edge = model prob - no-vig market prob
-PROP_TIERS = [(0.12, "HAMMER"), (0.08, "PLAY"), (0.05, "LEAN")]
+PROP_TIERS = [(0.12, "HAMMER"), (0.08, "PLAY"), (0.05, "LEAN")]   # EV at the DraftKings price
 POS_CODE = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
 
 STAT_MAP = {  # short name -> nflverse column
@@ -249,8 +249,36 @@ def am_to_prob(o):
     return 100 / (o + 100) if o > 0 else -o / (-o + 100)
 
 
+PRICE_BOOK = "draftkings"   # the book you bet: its line + price is what gets graded
+MIN_FAIR_BOOKS = 2          # other books needed (same line, both sides) for a market fair price
+MAX_VS_MARKET = 0.15        # model prob this far from the market's fair prob -> capped at LEAN
+
+
+def price_market(entry):
+    """DraftKings line/prices + market fair prob from other books at the same line (both sides)."""
+    if "books" not in entry:  # old cache format: consensus only
+        return dict(line=entry["line"], over=entry["over"], under=entry.get("under"), fair_over=None,
+                    n_fair=0, book="consensus")
+    books = entry["books"]
+    dk = books.get(PRICE_BOOK, {})
+    if "over" not in dk:
+        return None
+    line, over = dk["over"]
+    under = dk["under"][1] if "under" in dk and dk["under"][0] == line else None
+    fair = []
+    for b, v in books.items():
+        if b == PRICE_BOOK or "over" not in v or "under" not in v:
+            continue
+        if v["over"][0] == line and v["under"][0] == line:
+            io, iu = am_to_prob(v["over"][1]), am_to_prob(v["under"][1])
+            fair.append(io / (io + iu))
+    fair_over = float(np.mean(fair)) if len(fair) >= MIN_FAIR_BOOKS else None
+    return dict(line=float(line), over=float(over), under=float(under) if under is not None else None,
+                fair_over=fair_over, n_fair=len(fair), book="DK")
+
+
 def fetch_prop_lines(season, week, games, refresh=False):
-    """{(name_key, mkt): {line, over, under}} from Odds API. Cached per week."""
+    """{(name_key, mkt): {"books": {book: {over: (pt, price), under: (pt, price)}}}}. Cached per week."""
     cache = nfl.DATA / f"props_lines_{season}_wk{week:02d}.json"
     if cache.exists() and not refresh:
         return {tuple(k.split("|")): v for k, v in json.loads(cache.read_text()).items()}
@@ -289,16 +317,7 @@ def fetch_prop_lines(season, week, games, refresh=False):
                     if pt is None:
                         continue
                     raw.setdefault((name_key(player), mkt), {}).setdefault(bk["key"], {})[side] = (pt, oc["price"])
-    lines = {}
-    for k, books in raw.items():
-        pts = [v["over"][0] for v in books.values() if "over" in v]
-        if not pts:
-            continue
-        line = pd.Series(pts).mode().iloc[0]
-        ov = [v["over"][1] for v in books.values() if "over" in v and v["over"][0] == line]
-        un = [v["under"][1] for v in books.values() if "under" in v and v["under"][0] == line]
-        lines[k] = dict(line=float(line), over=float(np.median(ov)),
-                        under=float(np.median(un)) if un else None, books=len(ov))
+    lines = {k: {"books": books} for k, books in raw.items()}
     nfl.DATA.mkdir(exist_ok=True)
     cache.write_text(json.dumps({"|".join(k): v for k, v in lines.items()}))
     print(f"  prop lines: {len(lines)} player-markets from {len(events)} games"
@@ -359,24 +378,37 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
         m = bundle["models"][mkt]
         d["proj"] = m.predict_proba(X)[:, 1] if mkt == "atd" else m.predict(X)
         for _, r in d.iterrows():
-            ln = lines.get((r.name_key, mkt))
+            raw_ln = lines.get((r.name_key, mkt))
+            ln = price_market(raw_ln) if raw_ln else None
             rec = dict(game_id=r.game_id, team=r.team, opp=r.opp, player=r.player_display_name, inj=r.inj,
                        player_id=r.player_id, position=r.position, market=mkt, label=label,
                        proj=float(r.proj), line=np.nan, over_price=np.nan, under_price=np.nan,
-                       p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="")
+                       p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="",
+                       book="", fair=np.nan, vs_mkt="")
             if ln:
-                rec.update(line=ln["line"], over_price=ln["over"], under_price=ln["under"] or np.nan)
+                rec.update(line=ln["line"], over_price=ln["over"],
+                           under_price=ln["under"] if ln["under"] is not None else np.nan, book=ln["book"])
                 po = float(r.proj) if mkt == "atd" else p_over(bundle, mkt, r.proj, ln["line"])
-                io = am_to_prob(ln["over"])
-                iu = am_to_prob(ln["under"]) if ln["under"] else None
-                nv_o = io / (io + iu) if iu else io * 0.95  # yes-only TD markets: strip ~5% vig
-                e_o, e_u = po - nv_o, (1 - po) - (1 - nv_o)
-                if mkt == "atd" or iu is None:
-                    e_u = -1  # only bet the Yes side on TDs
-                side = "over" if e_o >= e_u else "under"
-                edge = max(e_o, e_u)
-                rec.update(p_over=po, edge=edge, side=side, price=ln["over"] if side == "over" else ln["under"])
-                rec["tier"] = next((t for thr, t in PROP_TIERS if edge >= thr), "")
+                # edge = expected value of the bet at the DraftKings price
+                ev_o = po * nfl.am_to_dec(ln["over"]) - 1
+                ev_u = (1 - po) * nfl.am_to_dec(ln["under"]) - 1 if ln["under"] is not None else -1
+                if mkt == "atd":
+                    ev_u = -1  # only bet the Yes side on TDs
+                side = "over" if ev_o >= ev_u else "under"
+                edge = max(ev_o, ev_u)
+                tier_ = next((t for thr, t in PROP_TIERS if edge >= thr), "")
+                if ln["fair_over"] is not None:
+                    fair_side = ln["fair_over"] if side == "over" else 1 - ln["fair_over"]
+                    model_side = po if side == "over" else 1 - po
+                    rec["fair"] = fair_side
+                    # model fighting the whole market by a mile = usually stale info (injury, role), not edge
+                    if model_side - fair_side > MAX_VS_MARKET and tier_ in ("HAMMER", "PLAY"):
+                        tier_, rec["vs_mkt"] = "LEAN", "capped"
+                elif mkt != "atd" and tier_ == "HAMMER":
+                    # no market check available (thin / DK off-market line): don't go max confidence
+                    tier_, rec["vs_mkt"] = "PLAY", "thin"
+                rec.update(p_over=po, edge=edge, side=side, tier=tier_,
+                           price=ln["over"] if side == "over" else ln["under"])
                 if mkt == "atd":
                     rec["pick"] = f"{r.player_display_name} TD"
                 else:
@@ -391,7 +423,7 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
         return props
     # games with real lines: only show players that have a line. Games without: top usage guys
     nol = props.line.isna()
-    game_has_lines = props.groupby("game_id").line.transform(lambda x: x.notna().any())
+    game_has_lines = props.line.notna().groupby(props.game_id).transform("any").astype(bool)
     rank = props[nol].groupby(["team", "market"]).proj.rank(ascending=False)
     cap = props.market.map({"pass_yds": 1, "rush_yds": 2, "rec_yds": 3, "receptions": 3, "atd": 3})
     props = props[~nol | (~game_has_lines & (rank.reindex(props.index) <= cap))]

@@ -131,8 +131,16 @@ def _prop_row(p):
         bits = [("LINE", line_txt), ("PROJ", proj)]
         if _s(p.get("hits")):
             bits.append(("HIT", p["hits"]))
+        if not pd.isna(p.get("fair")):
+            bits.append(("MKT", f'{p["fair"]:.0%}'))
         if tier_:
-            bits.append(("EDGE", f'+{p["edge"] * 100:.0f}%'))
+            bits.append(("EV", f'+{p["edge"] * 100:.0f}%'))
+        right = (f'<span class="ptier t-{tier_.lower()}"><i>{e(tier_)}</i>'
+                 f'{e("YES" if is_td else p["pick"])} <small>{e(_s(p.get("book")))} {e(_odds(p.get("price")))}</small></span>'
+                 if tier_ else '<span class="pnone">NO PLAY</span>')
+    else:
+        bits = [("PROJ", proj), ("LINE", "none yet")]
+        right = f'<span class="pproj">{e(proj)}</span>'
     cov = ""
     if not pd.isna(p.get("cov_edge")):
         bits.append(("vs MAN", f'{p["ypt_man"]:.1f}'))
@@ -141,12 +149,6 @@ def _prop_row(p):
         cls = "ok" if mark == "✓" else "bad" if mark == "✗" else ""
         pct = int(round(p["cov_edge"] * 100))
         cov = f'<span class="cov {cls}">COV {mark + " " if mark else ""}{f"{pct:+d}%" if pct else "0%"}</span>'
-        right = (f'<span class="ptier t-{tier_.lower()}"><i>{e(tier_)}</i>'
-                 f'{e("YES" if is_td else p["pick"])} <small>{e(_odds(p.get("price")))}</small></span>'
-                 if tier_ else '<span class="pnone">NO PLAY</span>')
-    else:
-        bits = [("PROJ", proj), ("LINE", "none yet")]
-        right = f'<span class="pproj">{e(proj)}</span>'
     return f"""
           <div class="prow" data-m="{e(p['market'])}" data-play="{1 if tier_ else 0}">
             <div class="pl"><b>{e(p['player'])}</b>{' <span class="q">Q</span>' if _s(p.get('inj')) == 'Questionable' else ''} <small>{e(p['position'])} · {e(p['team'])}</small></div>
@@ -159,6 +161,8 @@ def _props_panel(r, props):
     if props is None or props.empty:
         return ""
     gp = props[props.game_id == r["game_id"]].copy()
+    if gp.line.notna().any():          # real lines for this game -> only show players with a line
+        gp = gp[gp.line.notna()]
     if gp.empty:
         return ""
     gp["_r"] = gp.tier.fillna("").map(TIER_RANK).fillna(0)
