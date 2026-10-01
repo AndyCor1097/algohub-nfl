@@ -30,7 +30,7 @@ def read(path):
 
 
 # ----------------------------------------------------------------------------
-files = sorted(PICKS.glob("*_wk*.csv"), reverse=True)
+files = sorted((f for f in PICKS.glob("*_wk*.csv") if not f.name.startswith("props_")), reverse=True)
 st.markdown("#### THE ALGOHUB · NFL GAME ALGO")
 if not files:
     st.info("No picks yet. Run `python nfl_algo.py predict --week N` and push the picks folder.")
@@ -41,14 +41,16 @@ c1, _ = st.columns([1, 3])
 choice = c1.selectbox("Week", list(opts), label_visibility="collapsed")
 picks = read(opts[choice])
 season, week = int(picks.season.iloc[0]), int(picks.week.iloc[0])
+props = read(PICKS / f"props_{season}_wk{week:02d}.csv")
 
 t_cards, t_bets, t_record, t_bt = st.tabs(["Cards", "Best Bets", "Record", "Backtest"])
 
 # --- cards ------------------------------------------------------------------
 with t_cards:
     n_days = picks.gameday.nunique()
-    height = 330 + n_days * 70 + math.ceil(len(picks) / 3) * 900
-    components.html(render_cards(picks, season, week), height=height, scrolling=True)
+    height = 330 + n_days * 70 + math.ceil(len(picks) / 3) * 960
+    st.caption("Tap **PLAYER PROPS** on any game to open its props.")
+    components.html(render_cards(picks, season, week, props), height=height, scrolling=True)
 
 # --- best bets --------------------------------------------------------------
 with t_bets:
@@ -64,6 +66,16 @@ with t_bets:
         if isinstance(r.get("ml_pick"), str) and r.ml_pick:
             rows.append(dict(Matchup=mu, Day=r.gameday, Market="ML", Pick=f"{r.ml_pick} {int(r.ml_odds):+d}",
                              Tier="VALUE", Edge=round(r.ml_edge * 100, 1), Vegas="", Model=f"{r.home_wp:.0%} home"))
+    if props is not None and not props.empty:
+        for _, p in props[props.tier.fillna("") != ""].iterrows():
+            g = picks[picks.game_id == p.game_id]
+            mu = f"{g.away_team.iloc[0]} @ {g.home_team.iloc[0]}" if len(g) else p.team
+            is_td = p.market == "atd"
+            rows.append(dict(Matchup=mu, Day=g.gameday.iloc[0] if len(g) else "", Market=f"Prop · {p.label}",
+                             Pick=f"{p.player} {'TD' if is_td else p.pick} ({int(p.price):+d})",
+                             Tier=p.tier, Edge=round(p.edge * 100, 1),
+                             Vegas=f"{int(p.over_price):+d}" if is_td else f"{p.line:g}",
+                             Model=f"{p.proj:.0%}" if is_td else f"{p.proj:.1f}"))
     if rows:
         bets = pd.DataFrame(rows)
         bets["_r"] = bets.Tier.map(TIER_RANK).fillna(0)
@@ -73,7 +85,7 @@ with t_bets:
         m2.metric("Plays", int((bets.Tier == "PLAY").sum()))
         m3.metric("Leans", int((bets.Tier == "LEAN").sum()))
         st.dataframe(bets, hide_index=True, use_container_width=True)
-        st.caption("Edge = points vs. Vegas (ML: % over no-vig implied).")
+        st.caption("Edge = points vs. Vegas for spreads/totals; % over no-vig implied for ML and props.")
     else:
         st.info("No plays clear the thresholds this week.")
 

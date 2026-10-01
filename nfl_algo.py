@@ -54,10 +54,11 @@ ML_EDGE = 0.04               # model win prob minus no-vig implied prob
 # Shrinkage strength (in plays / games). Bigger = pulls harder toward league avg.
 K_PLAYS, K_PASS, K_RUSH, K_GAMES, K_QB = 170, 110, 90, 3, 150
 
-# Starting QBs come from the nflverse schedule automatically (it updates during the week).
-# Use this only to force someone the schedule doesn't have yet: {"TB": "Jalon Daniels"}.
-# A QB with no snaps this season gets rated replacement level (league avg minus the penalty).
-QB_OVERRIDES = {}
+# Starting QBs: by default each team keeps last week's starter. List QB changes here
+# (full name). A QB with no snaps this season gets rated replacement level.
+# Clear an entry once that QB has started a game.
+QB_OVERRIDES = {"TB": "Jalon Daniels"}
+QB_FROM_SCHEDULE = False   # True = also trust nflverse schedule's projected QBs (often stale)
 REPLACEMENT_QB_PENALTY = 0.12   # EPA/play below league avg for a QB with no stats
 QB_ACTIVE = dict(QB_OVERRIDES)  # schedule starters + manual overrides, filled in by predict()
 LAST_FRAME = None               # game frame from the last build_all(), reused by props
@@ -68,6 +69,10 @@ TZ = {  # hours west of ET, for travel
     **dict.fromkeys("DEN ARI".split(), 2),
     **dict.fromkeys("LA LAC LV SF SEA OAK SD".split(), 3),
 }
+DIVISION = {t: d for d, ts in {
+    "AFCE": "BUF MIA NE NYJ", "AFCN": "BAL CIN CLE PIT", "AFCS": "HOU IND JAX TEN",
+    "AFCW": "DEN KC LV LAC OAK SD", "NFCE": "DAL NYG PHI WAS", "NFCN": "CHI DET GB MIN",
+    "NFCS": "ATL CAR NO TB", "NFCW": "ARI LA SF SEA STL"}.items() for t in ts.split()}
 INTL = ["wembley", "tottenham", "twickenham", "allianz", "deutsche bank", "frankfurt",
         "azteca", "estadio", "croke", "bernab", "maracan", "corinthians", "melbourne",
         "olympiastadion", "dublin", "madrid", "munich", "london", "sao paulo"]
@@ -208,6 +213,69 @@ def load_player_week(season, refresh=False):
 def load_schedule(refresh=False):
     """nflverse schedule: kickoff times (ET) + projected starting QBs, updated through the week."""
     return _cached("schedule", lambda: _nflverse_csv("schedules/games.csv"), refresh)
+
+
+def load_injuries(refresh=False):
+    """Official injury reports (practice participation + game status), current season."""
+    return _cached(f"injuries_{CURRENT_SEASON}",
+                   lambda: _nflverse_csv(f"injuries/injuries_{CURRENT_SEASON}.csv"), refresh)
+
+
+def load_depth(refresh=False):
+    """Latest daily depth chart snapshot (big file upstream, only the newest snapshot is kept)."""
+    def fetch():
+        d = _nflverse_csv(f"depth_charts/depth_charts_{CURRENT_SEASON}.csv")
+        if d.empty or "dt" not in d.columns:
+            return d
+        d = d[d.dt == d.groupby("team").dt.transform("max")]
+        return d.drop_duplicates(["team", "gsis_id", "pos_abb"])
+    return _cached(f"depth_{CURRENT_SEASON}", fetch, refresh)
+
+
+OUT_STATUSES = {"Out", "Doubtful"}
+
+
+def injury_report(week):
+    """{gsis_id: dict(name, team, pos, status, practice)} for this week's report."""
+    inj = load_injuries()
+    if inj.empty:
+        return {}
+    w = inj[(inj.season == CURRENT_SEASON) & (inj.week == week)].copy()
+    w["team"] = w.team.replace(TEAM_FIX)
+    return {r.gsis_id: dict(name=r.full_name, team=r.team, pos=r.position,
+                            status=r.report_status if isinstance(r.report_status, str) else "",
+                            practice=r.practice_status if isinstance(r.practice_status, str) else "")
+            for r in w.itertuples()}
+
+
+def auto_qbs(week, inj):
+    """If last week's starter is ruled Out/Doubtful, next healthy QB on the depth chart starts."""
+    q = load_passing(CURRENT_SEASON)
+    if q.empty:
+        return {}, {}
+    q = q[(q.season == CURRENT_SEASON) & (q.week < week)].copy()
+    q["recent_team"] = q.recent_team.replace(TEAM_FIX)
+    q = q.sort_values(["week", "attempts"]).groupby("recent_team").tail(1)
+    depth = load_depth()
+    if not depth.empty:
+        depth = depth[depth.pos_abb == "QB"].copy()
+        depth["team"] = depth.team.replace(TEAM_FIX)
+    out, notes = {}, {}
+    for r in q.itertuples():
+        st = inj.get(r.player_id, {})
+        if st.get("status") in OUT_STATUSES:
+            nxt = None
+            if not depth.empty:
+                for d in depth[depth.team == r.recent_team].sort_values("pos_rank").itertuples():
+                    if d.gsis_id != r.player_id and inj.get(d.gsis_id, {}).get("status") not in OUT_STATUSES:
+                        nxt = d.player_name
+                        break
+            if nxt:
+                out[r.recent_team] = nxt
+                print(f"  injury: {r.player_name} ({r.recent_team}) {st['status']} -> {nxt} starts")
+        elif st.get("practice", "").startswith("Did Not"):
+            notes[r.recent_team] = f"{r.player_name} DNP"
+    return out, notes
 
 
 ESPN_ABBR = {"WSH": "WAS", "LAR": "LA", "JAC": "JAX", "LV": "LV", "OAK": "LV"}
@@ -355,7 +423,8 @@ def build_frame(games, plays, passing):
     df["dome"] = roof.isin(["dome", "closed"]).astype(int)
     df["temp"] = np.where(df.dome == 1, 70, pd.to_numeric(df.temp, errors="coerce").fillna(60))
     df["wind"] = np.where(df.dome == 1, 0, pd.to_numeric(df.wind, errors="coerce").fillna(8))
-    df["div"] = _boolint(df.div_game)
+    same_div = df.home_team.map(DIVISION) == df.away_team.map(DIVISION)
+    df["div"] = np.maximum(_boolint(df.div_game), same_div.astype(int))  # nfldata leaves 2026 blank
     stad = df.stadium.fillna("").astype(str).str.lower()
     df["is_intl"] = stad.apply(lambda s: int(any(k in s for k in INTL)))
     df["tz_travel"] = (df.home_team.map(TZ).fillna(0) - df.away_team.map(TZ).fillna(0)).abs()
@@ -655,6 +724,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
         print(f"refreshing {season} data...")
         load_games(season, True); load_plays(season, True); load_passing(season, True)
         load_player_week(season, True); load_schedule(True)
+        load_injuries(True); load_depth(True)
     bundle = joblib.load(MODELS / "nfl_bundle.joblib")
 
     # schedule: ET kickoff times + projected starting QBs (manual QB_OVERRIDES win)
@@ -669,8 +739,10 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
                 n = s.get(f"{side}_qb_name")
                 if isinstance(n, str) and n.strip():
                     starters[s[f"{side}_team"]] = n.strip()
+    inj = injury_report(week)
+    inj_qbs, qb_notes = auto_qbs(week, inj)
     global QB_ACTIVE
-    QB_ACTIVE = {**starters, **QB_OVERRIDES}
+    QB_ACTIVE = {**(starters if QB_FROM_SCHEDULE else {}), **inj_qbs, **QB_OVERRIDES}
 
     df = build_all()
     wk = df[(df.season == season) & (df.week == week)].copy()
@@ -743,7 +815,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
                 d.update(ml_pick=h if home_side else a,
                          ml_odds=r.ml_home if home_side else r.ml_away,
                          ml_edge=eh if home_side else ea)
-        d["flags"] = "|".join(_flags(r))
+        d["flags"] = "|".join(_flags(r) + _injury_flags(r, inj, qb_notes, week))
         rows.append(d)
 
     out = pd.DataFrame(rows)
@@ -763,7 +835,9 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
         import props
         print("props...")
         try:
-            pr = props.predict(wk, season, week, QB_ACTIVE, refresh_lines=refresh_lines)
+            qbs = {**dict(zip(wk.home_team, wk.h_qb_name)), **dict(zip(wk.away_team, wk.a_qb_name))}
+            qbs = {t: n for t, n in qbs.items() if isinstance(n, str)}
+            pr = props.predict(wk, season, week, qbs, refresh_lines=refresh_lines, injuries=inj)
             pr.to_csv(PICKS / f"props_{tag}.csv", index=False)
             n_pk = int((pr.tier.fillna("") != "").sum()) if len(pr) else 0
             print(f"  {len(pr)} player props, {n_pk} plays -> picks/props_{tag}.csv")
@@ -784,6 +858,29 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
         print(f"{r.away_team:>3} @ {r.home_team:<3}  model {r.model_line:<10} vegas {r.market_line:<10} "
               f"| {sp:<26} | {tt}")
     print(f"\npicks -> {PICKS / (tag + '.csv')}\ncards -> {html_path}")
+
+
+def _injury_flags(r, inj, qb_notes, week):
+    """OUT / Q chips for skill players who actually get usage this season."""
+    if not inj:
+        return []
+    ps = load_player_week(CURRENT_SEASON)
+    use = {}
+    if not ps.empty:
+        ps = ps[ps.week < week]
+        u = ps.assign(t=ps.targets.fillna(0) + ps.carries.fillna(0) + ps.attempts.fillna(0)).groupby("player_id").t.mean()
+        use = u.to_dict()
+    out = []
+    for team in (r.away_team, r.home_team):
+        if team in qb_notes and team not in QB_OVERRIDES:
+            out.append(f"{team} QB? {qb_notes[team]}")
+        hits = [(v, use.get(k, 0)) for k, v in inj.items()
+                if v["team"] == team and v["pos"] in ("QB", "RB", "WR", "TE") and use.get(k, 0) >= 4
+                and v["status"] in ("Out", "Doubtful", "Questionable")]
+        for v, _ in sorted(hits, key=lambda x: -x[1])[:3]:
+            tag = "OUT" if v["status"] == "Out" else v["status"][0]
+            out.append(f"{tag}: {v['name']}")
+    return out
 
 
 def _flags(r):

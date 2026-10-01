@@ -327,11 +327,18 @@ def candidates(st, wk, starters):
     return c
 
 
-def predict(wk, season, week, starters, refresh_lines=False):
+def predict(wk, season, week, starters, refresh_lines=False, injuries=None):
     bundle = joblib.load(nfl.MODELS / "props_bundle.joblib")
     frame = nfl.LAST_FRAME
     st = load_stats()
     cand = candidates(st, wk, starters)
+    injuries = injuries or {}
+    status = cand.player_id.map(lambda k: injuries.get(k, {}).get("status", ""))
+    dropped = cand[status.isin(["Out", "Doubtful"])]
+    if len(dropped):
+        print(f"  props: dropped {len(dropped)} Out/Doubtful players")
+    cand = cand[~status.isin(["Out", "Doubtful"])].copy()
+    cand["inj"] = status[cand.index].fillna("")
     df = build_rows(st, frame, cand)
     lines = fetch_prop_lines(season, week, wk, refresh_lines)
     hist = st[st.season == season]
@@ -342,7 +349,10 @@ def predict(wk, season, week, starters, refresh_lines=False):
         base = eligible(df, mkt)
         if mkt == "pass_yds":
             base &= df.is_starter
-        d = df[(base | (has_line & df.position.isin(MARKETS[mkt][3]))) & (df.gp >= 1)].copy()
+        keep = base | (has_line & df.position.isin(MARKETS[mkt][3]))
+        if mkt == "pass_yds":
+            keep &= df.is_starter
+        d = df[keep & (df.gp >= 1)].copy()
         if d.empty:
             continue
         X = d[bundle["features"]]
@@ -350,7 +360,7 @@ def predict(wk, season, week, starters, refresh_lines=False):
         d["proj"] = m.predict_proba(X)[:, 1] if mkt == "atd" else m.predict(X)
         for _, r in d.iterrows():
             ln = lines.get((r.name_key, mkt))
-            rec = dict(game_id=r.game_id, team=r.team, opp=r.opp, player=r.player_display_name,
+            rec = dict(game_id=r.game_id, team=r.team, opp=r.opp, player=r.player_display_name, inj=r.inj,
                        player_id=r.player_id, position=r.position, market=mkt, label=label,
                        proj=float(r.proj), line=np.nan, over_price=np.nan, under_price=np.nan,
                        p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="")
