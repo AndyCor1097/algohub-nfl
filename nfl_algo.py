@@ -779,9 +779,30 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
                 wk.at[i, "stadium"] = k[2]
     print(f"  kickoff times (ET) for {sum((r.home_team, r.away_team) in kicks for _, r in wk.iterrows())}/{len(wk)} games")
 
+    # kickoff-time weather (the model uses temp/wind, but future games have them blank -> 60F/8mph)
+    base_total = bundle["total"].predict(wk[bundle["features"]])
+    try:
+        import nfl_weather
+        wk = nfl_weather.apply(wk)
+    except Exception as ex:
+        print(f"  ! weather skipped: {type(ex).__name__}: {ex}")
     X = wk[bundle["features"]]
     wk["pred_margin"] = bundle["margin"].predict(X)
     wk["pred_total"] = bundle["total"].predict(X)
+    # The model is deliberately conservative, so it under-reacts to wind. History (2012-25, outdoor):
+    # ~0.33 fewer points per mph above 8 mph (0-5 mph games avg 46.5, 15-20 mph 42.2), plus real rain/snow.
+    # Use whichever weather hit is bigger: the model's own, or the historical one.
+    for (i, r), b in zip(wk.iterrows(), base_total):
+        model_d = r.pred_total - b
+        rule_d = 0.0
+        if not r.dome:
+            rule_d -= 0.33 * max(0.0, min(float(r.wind), 24.0) - 8.0)
+            if float(r.get("precip_in", 0) or 0) >= 0.15:
+                rule_d -= 2.0 if float(r.temp) <= 33 else 1.0
+        d = min(model_d, rule_d) if rule_d < 0 else model_d
+        wk.at[i, "pred_total"] = b + d
+        if abs(d) >= 0.3:
+            print(f"  weather moved {r.away_team} @ {r.home_team} total {b:.1f} -> {b + d:.1f}")
     wk["home_wp"] = norm.cdf(wk.pred_margin / bundle["sigma_margin"])
     wk["proj_home"] = (wk.pred_total + wk.pred_margin) / 2
     wk["proj_away"] = (wk.pred_total - wk.pred_margin) / 2
@@ -927,10 +948,14 @@ def _flags(r):
         f.append("INTL")
     elif r.dome:
         f.append("DOME")
-    if r.wind >= 15:
-        f.append(f"WIND {int(r.wind)}")
-    if r.temp <= 32 and not r.dome:
-        f.append(f"{int(r.temp)}°F")
+    wx = r.get("wx_label", "") if hasattr(r, "get") else ""
+    if isinstance(wx, str) and wx:
+        f.append(("💨 " if r.wind >= 15 else "") + wx)      # kickoff forecast chip
+    else:
+        if r.wind >= 15:
+            f.append(f"WIND {int(r.wind)}")
+        if r.temp <= 32 and not r.dome:
+            f.append(f"{int(r.temp)}°F")
     if r["div"]:
         f.append("DIVISION")
     if r.tz_travel >= 3 and not r.is_intl:

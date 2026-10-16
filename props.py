@@ -457,6 +457,26 @@ def candidates(st, wk, starters):
     return c
 
 
+def weather_mult(w, mkt):
+    """Multiplier on a projection from kickoff weather. Measured on 2021-25 outdoor games
+    (team stats vs that team's season average):
+        wind 10-15: pass yds 0.98 | 15-20: pass 0.90, rec 0.95, TDs 0.83 | 20+: pass 0.81, rec 0.82
+        under 45F:  pass yds 0.93, receptions 0.95.  Rushing barely moves."""
+    if not w or w.get("dome"):
+        return 1.0
+    over = max(0.0, min(w["wind"], 26.0) - 10.0)
+    cold = w["temp"] < 45
+    if mkt in ("pass_yds", "rec_yds"):
+        m = (1 - 0.011 * over) * (0.95 if cold else 1.0)
+    elif mkt == "receptions":
+        m = (1 - 0.006 * over) * (0.97 if cold else 1.0)
+    elif mkt == "atd":
+        m = (1 - 0.012 * over) * (0.97 if cold else 1.0)
+    else:
+        m = 1.0
+    return max(m, 0.78)
+
+
 def predict(wk, season, week, starters, refresh_lines=False, injuries=None, frame=None):
     bundle = joblib.load(nfl.MODELS / "props_bundle.joblib")
     frame = nfl.LAST_FRAME if frame is None else frame
@@ -472,6 +492,13 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
     df = build_rows(st, frame, cand)
     lines = fetch_prop_lines(season, week, wk, refresh_lines)
     hist = st[st.season == season]
+
+    # kickoff weather per game (filled by nfl_weather.apply in nfl_algo.predict)
+    wx = {}
+    if "game_id" in wk.columns:
+        for _, g in wk.iterrows():
+            wx[g.game_id] = dict(wind=float(g.get("wind", 8) or 0), temp=float(g.get("temp", 60) or 60),
+                                 dome=int(g.get("dome", 0) or 0))
 
     out = []
     for mkt, (_, stat, label, _) in MARKETS.items():
@@ -490,12 +517,14 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
         X = d[bundle["features"]]
         m = bundle["models"][mkt]
         d["proj"] = m.predict_proba(X)[:, 1] if mkt == "atd" else m.predict(X)
+        d["wx_mult"] = d.game_id.map(lambda g: weather_mult(wx.get(g), mkt))
+        d["proj"] = d.proj * d.wx_mult
         for _, r in d.iterrows():
             raw_ln = lines.get((r.name_key, mkt))
             ln = price_market(raw_ln) if raw_ln else None
             rec = dict(game_id=r.game_id, team=r.team, opp=r.opp, player=r.player_display_name, inj=r.inj,
                        player_id=r.player_id, position=r.position, market=mkt, label=label,
-                       proj=float(r.proj), line=np.nan, over_price=np.nan, under_price=np.nan,
+                       proj=float(r.proj), wx_mult=float(r.wx_mult), line=np.nan, over_price=np.nan, under_price=np.nan,
                        p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="",
                        book="", fair=np.nan, vs_mkt="", ev=np.nan)
             if ln:
