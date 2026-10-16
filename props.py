@@ -345,52 +345,95 @@ def price_market(entry):
                 fair_over=fair_over, n_fair=len(fair), book="DK")
 
 
+def _parse_event(js):
+    raw = {}
+    for bk in js.get("bookmakers", []):
+        for mk in bk.get("markets", []):
+            mkt = API_TO_MKT.get(mk["key"])
+            if not mkt:
+                continue
+            for oc in mk.get("outcomes", []):
+                player = oc.get("description") or oc.get("name")
+                side = oc.get("name", "").lower()
+                side = "over" if side in ("over", "yes") else "under" if side in ("under", "no") else None
+                if not side:
+                    continue
+                pt = oc.get("point", 0.5 if mkt == "atd" else None)
+                if pt is None:
+                    continue
+                raw.setdefault("|".join((name_key(player), mkt)), {}).setdefault(bk["key"], {})[side] = (pt, oc["price"])
+    return {k: {"books": b} for k, b in raw.items()}
+
+
+REFETCH_WITHIN_H = 30   # games kicking off within this many hours get fresh lines...
+REFETCH_AFTER_H = 12    # ...if the saved ones are older than this
+
+
 def fetch_prop_lines(season, week, games, refresh=False):
-    """{(name_key, mkt): {"books": {book: {over: (pt, price), under: (pt, price)}}}}. Cached per week."""
+    """{(name_key, mkt): {"books": {book: {over: (pt, price), under: (pt, price)}}}}. Cached per week.
+
+    Books post props a few games at a time during the week, so a Tuesday pull only has some games.
+    Each run only spends credits on games that (a) have no props saved yet, or (b) kick off within
+    30h and were last pulled 12h+ ago. refresh=True re-pulls everything."""
+    from datetime import datetime, timezone
     cache = nfl.DATA / f"props_lines_{season}_wk{week:02d}.json"
-    if cache.exists() and not refresh:
-        return {tuple(k.split("|")): v for k, v in json.loads(cache.read_text()).items()}
+    meta_f = nfl.DATA / f"props_lines_{season}_wk{week:02d}_events.json"
+    lines = json.loads(cache.read_text()) if cache.exists() and not refresh else {}
+    meta = json.loads(meta_f.read_text()) if meta_f.exists() and not refresh else {}
+    to_tuple = lambda d: {tuple(k.split("|")): v for k, v in d.items()}
+
     key = nfl.odds_key()
     if not key:
-        print("  (no Odds API key found: props show projections only, no picks)")
-        return {}
-    r = requests.get(f"{ODDS_BASE}/events", params={"apiKey": key}, timeout=30)
+        if not lines:
+            print("  (no Odds API key found: props show projections only, no picks)")
+        return to_tuple(lines)
+    try:
+        r = requests.get(f"{ODDS_BASE}/events", params={"apiKey": key}, timeout=30)   # free call
+    except Exception as ex:
+        print(f"  ! odds api events: {ex}")
+        return to_tuple(lines)
     if r.status_code != 200:
         print(f"  ! odds api events {r.status_code}: {r.text[:120]}")
-        return {}
+        return to_tuple(lines)
     want = {(h, a) for h, a in zip(games.home_team, games.away_team)}
     events = [e for e in r.json()
               if (nfl.ODDS_NAMES.get(e["home_team"]), nfl.ODDS_NAMES.get(e["away_team"])) in want]
-    markets = ",".join(v[0] for v in MARKETS.values())
-    raw, used = {}, None
+
+    now = datetime.now(timezone.utc)
+    pulled, used = 0, None
     for ev in events:
+        m = meta.get(ev["id"])
+        kick = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
+        hrs_to_kick = (kick - now).total_seconds() / 3600
+        if hrs_to_kick < -4:
+            continue                                        # already played
+        if m and m.get("n", 0) > 0:
+            age = (now - datetime.fromisoformat(m["fetched"])).total_seconds() / 3600
+            if not (0 <= hrs_to_kick <= REFETCH_WITHIN_H and age >= REFETCH_AFTER_H):
+                continue                                    # have it, still fresh enough
         rr = requests.get(f"{ODDS_BASE}/events/{ev['id']}/odds", timeout=30, params=dict(
-            apiKey=key, regions="us", markets=markets, oddsFormat="american"))
+            apiKey=key, regions="us", markets=",".join(v[0] for v in MARKETS.values()), oddsFormat="american"))
         used = rr.headers.get("x-requests-remaining", used)
         if rr.status_code != 200:
             print(f"  ! props {ev['away_team']} @ {ev['home_team']}: {rr.status_code}")
             continue
-        for bk in rr.json().get("bookmakers", []):
-            for mk in bk.get("markets", []):
-                mkt = API_TO_MKT.get(mk["key"])
-                if not mkt:
-                    continue
-                for oc in mk.get("outcomes", []):
-                    player = oc.get("description") or oc.get("name")
-                    side = oc.get("name", "").lower()
-                    side = "over" if side in ("over", "yes") else "under" if side in ("under", "no") else None
-                    if not side:
-                        continue
-                    pt = oc.get("point", 0.5 if mkt == "atd" else None)
-                    if pt is None:
-                        continue
-                    raw.setdefault((name_key(player), mkt), {}).setdefault(bk["key"], {})[side] = (pt, oc["price"])
-    lines = {k: {"books": books} for k, books in raw.items()}
+        got = _parse_event(rr.json())
+        pulled += 1
+        for k in (m or {}).get("keys", []):                 # drop this game's old lines, keep the rest
+            lines.pop(k, None)
+        lines.update(got)
+        meta[ev["id"]] = {"fetched": now.isoformat(), "n": len(got), "keys": list(got),
+                          "game": f"{ev['away_team']} @ {ev['home_team']}"}
+        print(f"  props {ev['away_team']} @ {ev['home_team']}: {len(got)} player-markets"
+              + ("" if got else " (books haven't posted yet)"))
+
     nfl.DATA.mkdir(exist_ok=True)
-    cache.write_text(json.dumps({"|".join(k): v for k, v in lines.items()}))
-    print(f"  prop lines: {len(lines)} player-markets from {len(events)} games"
-          + (f" | odds api credits left: {used}" if used else ""))
-    return lines
+    cache.write_text(json.dumps(lines))
+    meta_f.write_text(json.dumps(meta))
+    games_with = sum(1 for v in meta.values() if v.get("n", 0) > 0)
+    print(f"  prop lines: {len(lines)} player-markets | {games_with}/{len(events)} games have props"
+          + f" | pulled {pulled} games this run" + (f" | odds api credits left: {used}" if used else ""))
+    return to_tuple(lines)
 
 
 # ----------------------------------------------------------------------------

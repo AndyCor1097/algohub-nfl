@@ -62,7 +62,7 @@ K_PLAYS, K_PASS, K_RUSH, K_GAMES, K_QB = 170, 110, 90, 3, 150
 # Starting QBs: by default each team keeps last week's starter. List QB changes here
 # (full name). A QB with no snaps this season gets rated replacement level.
 # Clear an entry once that QB has started a game.
-QB_OVERRIDES = {"TB": "Jalon Daniels"}
+QB_OVERRIDES = {"TB": "Jalon Daniels", "CHI": "Caleb Williams", "PHI": "Tanner McKee"}
 QB_FROM_SCHEDULE = False   # True = also trust nflverse schedule's projected QBs (often stale)
 REPLACEMENT_QB_PENALTY = 0.12   # EPA/play below league avg for a QB with no stats
 QB_ACTIVE = dict(QB_OVERRIDES)  # schedule starters + manual overrides, filled in by predict()
