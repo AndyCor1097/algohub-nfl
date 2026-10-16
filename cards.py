@@ -121,6 +121,11 @@ def _odds(v):
     return "" if v is None or (isinstance(v, float) and math.isnan(v)) else f"{int(v):+d}"
 
 
+def _is_lotto(p):
+    v = p.get("lotto")
+    return not (v is None or (isinstance(v, float) and math.isnan(v))) and int(v) == 1
+
+
 def _prop_row(p):
     tier_ = _s(p.get("tier"))
     is_td = p["market"] == "atd"
@@ -139,7 +144,9 @@ def _prop_row(p):
                 bits.append(("EV", f'{p["ev"] * 100:+.0f}%'))
         right = (f'<span class="ptier t-{tier_.lower()}"><i>{e(tier_)}</i>'
                  f'{e("YES" if is_td else p["pick"])} <small>{e(_s(p.get("book")))} {e(_odds(p.get("price")))}</small></span>'
-                 if tier_ else '<span class="pnone">NO PLAY</span>')
+                 if tier_ else
+                 f'<span class="ptier t-lotto"><i>🎰 LOTTO</i>YES <small>{e(_odds(p.get("over_price")))}</small></span>'
+                 if _is_lotto(p) else '<span class="pnone">NO PLAY</span>')
     else:
         bits = [("PROJ", proj), ("LINE", "none yet")]
         right = f'<span class="pproj">{e(proj)}</span>'
@@ -152,7 +159,7 @@ def _prop_row(p):
         pct = int(round(p["cov_edge"] * 100))
         cov = f'<span class="cov {cls}">COV {mark + " " if mark else ""}{f"{pct:+d}%" if pct else "0%"}</span>'
     return f"""
-          <div class="prow" data-m="{e(p['market'])}" data-play="{1 if tier_ else 0}">
+          <div class="prow" data-m="{e(p['market'])}" data-play="{1 if tier_ else 0}"{' data-lotto="1"' if _is_lotto(p) else ''}>
             <div class="pl"><b>{e(p['player'])}</b>{' <span class="q">Q</span>' if _s(p.get('inj')) == 'Questionable' else ''} <small>{e(p['position'])} · {e(p['team'])}</small></div>
             {right}
             <div class="pm"><span class="mk">{e(p['label'].upper())}</span>{"".join(f'<span>{k} <b>{e(v)}</b></span>' for k, v in bits)}{cov}</div>
@@ -168,6 +175,8 @@ def _props_panel(r, props):
     if gp.empty:
         return ""
     gp["_r"] = gp.tier.fillna("").map(TIER_RANK).fillna(0)
+    if "lotto" in gp:                  # lotto TDs right under the real plays
+        gp["_r"] = gp._r + 0.5 * gp.lotto.fillna(0)
     gp["_t"] = (gp.team != r["away_team"]).astype(int)
     gp["_m"] = gp.market.map({k: i for i, k in enumerate(MKT_SHORT)})
     gp = gp.sort_values(["_r", "edge", "_t", "_m", "proj"], ascending=[False, False, True, True, False])
@@ -315,6 +324,7 @@ background:#0f1319;color:var(--tx);padding:13px 16px;font:700 11px Inter,system-
 .ptier{{flex:none;display:flex;align-items:center;gap:7px;font:700 17px "Barlow Condensed",sans-serif;white-space:nowrap}}
 .ptier i{{font:800 9px Inter,system-ui,sans-serif;font-style:normal;letter-spacing:.12em;padding:3px 6px;border-radius:5px;color:#0b0e13}}
 .ptier small{{color:var(--mu);font-size:12px}}
+.ptier.t-lotto i{{background:#bc8cff}} .ptier.t-lotto{{color:#d2b4ff}}
 .ptier.t-lean i{{background:var(--lean)}} .ptier.t-play i{{background:var(--play)}} .ptier.t-hammer i{{background:var(--ham)}} .ptier.t-hammer{{color:var(--ham)}}
 .pnone{{flex:none;color:#4b535d;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.14em}}
 .q{{font:800 9px Inter,system-ui,sans-serif;color:#0b0e13;background:var(--ham);padding:2px 4px;border-radius:4px;vertical-align:2px}}

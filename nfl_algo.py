@@ -1017,8 +1017,9 @@ def tracker_summary(tr=None):
         w, l, p = (g.result == "W").sum(), (g.result == "L").sum(), (g.result == "P").sum()
         u = g.units.sum()
         print(f"  {mkt:<20}{tr_:<7} {w}-{l}-{p}  {w / max(w + l, 1):.1%}  {u:+.2f}u  ROI {u / max(w + l, 1):+.1%}")
-    u = tr.units.sum()
-    print(f"  {'ALL':<27} {u:+.2f}u over {len(tr)} plays")
+    main = tr[tr.tier != "LOTTO"]
+    u = main.units.sum()
+    print(f"  {'ALL':<27} {u:+.2f}u over {len(main)} plays  (lotto TDs tracked separately)")
 
 
 # ----------------------------------------------------------------------------

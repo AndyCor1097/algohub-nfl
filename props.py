@@ -36,8 +36,21 @@ API_TO_MKT = {v[0]: k for k, v in MARKETS.items()}
 # tiers = model prob minus the DK price's break-even prob (percentage points).
 # (EV% is shown too, but it explodes on longshots, so it doesn't set tiers)
 PROP_TIERS = [(0.07, "HAMMER"), (0.05, "PLAY"), (0.03, "LEAN")]
-TD_MIN_PROB = 0.12     # no TD picks on guys the model gives <12%
-TD_MAX_PRICE = 700     # no TD picks longer than +700 (longshot noise, books are sharp there)
+TD_MIN_PROB = 0.12     # (legacy) no TD picks under 12%
+# Anytime TD, rebuilt Oct 2026 after a 6-27 start: on weeks 4-5 (581 lines) the TD model added NOTHING
+# beyond the market (its weight came out ~0 when fit next to the market price) and every TD "edge"
+# was the model overrating longshots (+500 and up: model 13%, market 8.5%, actual 7.4%).
+# What DID show up is the classic favorite-longshot bias: short TD prices hit MORE than the market's
+# fair %, longshots hit less. So TD probability now = the market's fair % run through a calibration
+# curve fit on our own graded weeks (refit every run), and TD plays only in the +100 to +250 range.
+TD_MIN_PRICE = 100     # no TD plays shorter than +100
+TD_MAX_PRICE = 250     # or longer than +250
+TD_CAL_DEFAULT = (0.17, 1.09)
+# Lotto TDs: just for fun, kept OUT of the main record. Top LOTTO_N longshots each week where the
+# model's TD % is highest relative to the market's. Longshots lose as a group (-11% on weeks 4-5),
+# so these are small-stake sprinkles with their own tracker, not plays.
+LOTTO_N = 5
+LOTTO_MIN_PRICE, LOTTO_MAX_PRICE = 300, 800   # (intercept, slope) on log-odds, half-strength version of the weeks 4-5 fit
 TD_HOLD = 1.20         # anytime-TD "Yes" prices carry ~20% hold
 POS_CODE = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
 
@@ -477,6 +490,42 @@ def weather_mult(w, mkt):
     return max(m, 0.78)
 
 
+def td_calibration(season, week, st):
+    """Fit outcome ~ market fair % (log-odds) on every past anytime-TD line we priced (all players, not just
+    picks). Shrunk toward 'market is exactly right' (0, 1) until there's a lot of data."""
+    from sklearn.linear_model import LogisticRegression
+    rows = []
+    for f in sorted(nfl.PICKS.glob(f"props_{season}_wk*.csv")):
+        try:
+            wk_ = int(f.stem.split("wk")[-1])
+        except ValueError:
+            continue
+        if wk_ >= week:
+            continue
+        d = pd.read_csv(f)
+        d = d[(d.market == "atd") & d.fair.notna()][["player_id", "fair"]].assign(week=wk_)
+        rows.append(d)
+    if not rows:
+        return TD_CAL_DEFAULT
+    d = pd.concat(rows).merge(st[st.season == season][["player_id", "week", "any_td"]], on=["player_id", "week"])
+    if len(d) < 150 or d.any_td.nunique() < 2:
+        return TD_CAL_DEFAULT
+    z = np.log(d.fair.clip(.01, .99) / (1 - d.fair.clip(.01, .99))).values.reshape(-1, 1)
+    m = LogisticRegression(C=1e6).fit(z, d.any_td)
+    a, b = float(m.intercept_[0]), float(m.coef_[0][0])
+    w = len(d) / (len(d) + 600)                 # 600 lines of data = trust the fit half way
+    a, b = a * w, 1 + (b - 1) * w
+    b = min(max(b, 0.8), 1.4)
+    print(f"  TD calibration from {len(d)} past lines: intercept {a:+.2f}, slope {b:.2f}")
+    return a, b
+
+
+def td_prob(fair, cal):
+    a, b = cal
+    f = min(max(fair, .01), .99)
+    return float(1 / (1 + np.exp(-(a + b * np.log(f / (1 - f))))))
+
+
 def predict(wk, season, week, starters, refresh_lines=False, injuries=None, frame=None):
     bundle = joblib.load(nfl.MODELS / "props_bundle.joblib")
     frame = nfl.LAST_FRAME if frame is None else frame
@@ -499,6 +548,12 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
         for _, g in wk.iterrows():
             wx[g.game_id] = dict(wind=float(g.get("wind", 8) or 0), temp=float(g.get("temp", 60) or 60),
                                  dome=int(g.get("dome", 0) or 0))
+
+    try:
+        td_cal = td_calibration(season, week, st)
+    except Exception as ex:
+        print(f"  ! TD calibration skipped ({type(ex).__name__}), using default")
+        td_cal = TD_CAL_DEFAULT
 
     out = []
     for mkt, (_, stat, label, _) in MARKETS.items():
@@ -530,7 +585,15 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
             if ln:
                 rec.update(line=ln["line"], over_price=ln["over"],
                            under_price=ln["under"] if ln["under"] is not None else np.nan, book=ln["book"])
-                po = float(r.proj) if mkt == "atd" else p_over(bundle, mkt, r.proj, ln["line"])
+                if mkt == "atd":
+                    # market-first: no fair price from other books = no TD play
+                    po = td_prob(ln["fair_over"], td_cal) * float(r.wx_mult) if ln["fair_over"] is not None else None
+                else:
+                    po = p_over(bundle, mkt, r.proj, ln["line"])
+                if po is None:
+                    rec.update(line=ln["line"], vs_mkt="no market")
+                    out.append(rec)
+                    continue
                 # edge = model prob minus break-even prob of the DraftKings price
                 e_o = po - am_to_prob(ln["over"])
                 e_u = (1 - po) - am_to_prob(ln["under"]) if ln["under"] is not None else -1
@@ -543,9 +606,13 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                 tier_ = next((t for thr, t in PROP_TIERS if edge >= thr), "")
                 if not r.in_model:
                     tier_, rec["vs_mkt"] = "", "low usage"
-                elif mkt == "atd" and (po < TD_MIN_PROB or ln["over"] > TD_MAX_PRICE):
-                    tier_, rec["vs_mkt"] = "", "longshot"
-                if ln["fair_over"] is not None:
+                elif mkt == "atd" and not (TD_MIN_PRICE <= ln["over"] <= TD_MAX_PRICE):
+                    tier_, rec["vs_mkt"] = "", "price range"
+                if mkt == "atd":
+                    rec["fair"] = ln["fair_over"]
+                    if tier_ == "HAMMER":           # new approach: no max-confidence TD plays yet
+                        tier_ = "PLAY"
+                elif ln["fair_over"] is not None:
                     fair_side = ln["fair_over"] if side == "over" else 1 - ln["fair_over"]
                     model_side = po if side == "over" else 1 - po
                     rec["fair"] = fair_side
@@ -576,6 +643,19 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
     rank = props[nol].groupby(["team", "market"]).proj.rank(ascending=False)
     cap = props.market.map({"pass_yds": 1, "rush_yds": 2, "rec_yds": 3, "receptions": 3, "atd": 3})
     props = props[~nol | (~game_has_lines & (rank.reindex(props.index) <= cap))]
+    # ---- Lotto TDs
+    props["lotto"] = 0
+    props["lotto_ratio"] = np.nan
+    td = props[(props.market == "atd") & props.line.notna() & props.fair.notna() & props.over_price.between(LOTTO_MIN_PRICE, LOTTO_MAX_PRICE)
+               & (props.proj >= 0.10)]
+    if len(td):
+        ratio = td.proj / td.fair
+        props.loc[td.index, "lotto_ratio"] = ratio.round(2)
+        best = ratio[ratio > 1.0].sort_values(ascending=False).head(LOTTO_N).index
+        props.loc[best, "lotto"] = 1
+        props.loc[best, "price"] = props.loc[best, "over_price"]
+        names = [f"{props.at[i, 'player']} {int(props.at[i, 'over_price']):+d}" for i in best]
+        print("  lotto TDs: " + (", ".join(names) or "none"))
     props.insert(0, "season", season)
     props.insert(1, "week", week)
     return props.reset_index(drop=True)
@@ -586,14 +666,17 @@ def grade(season, week):
     if not f.exists():
         return []
     props = pd.read_csv(f)
-    props = props[props.tier.fillna("") != ""]
+    lotto = props.get("lotto", pd.Series(0, index=props.index)).fillna(0).astype(int) == 1
+    props = props[(props.tier.fillna("") != "") | lotto].copy()
+    is_l = props.get("lotto", pd.Series(0, index=props.index)).fillna(0).astype(int) == 1
+    props.loc[is_l & (props.tier.fillna("") == ""), "tier"] = "LOTTO"
     st = load_stats(refresh_current=True)
     act = st[(st.season == season) & (st.week == week)].set_index("player_id")
     rows = []
     for _, r in props.iterrows():
         stat = MARKETS[r.market][1]
         base = dict(game_id=r.game_id, season=season, week=week, matchup=f"{r.player} ({r.team})",
-                    market=f"PROP {r.label.upper()}", tier=r.tier, pick=f"{r.player} {r.pick}" if r.market != "atd" else r.pick,
+                    market="LOTTO TD" if r.tier == "LOTTO" else f"PROP {r.label.upper()}", tier=r.tier, pick=f"{r.player} {r.pick}" if r.market != "atd" else r.pick,
                     edge=round(r.edge, 3))
         if r.player_id not in act.index:
             o, score = "P", "DNP"  # books void props for players who don't play
