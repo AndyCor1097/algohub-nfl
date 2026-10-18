@@ -679,7 +679,53 @@ def odds_key():
     return k or None
 
 
+def fetch_novig_lines():
+    """Game lines from the Novig exchange (free, no credits): main spread, main total, moneyline."""
+    try:
+        sys.path.insert(0, str(ROOT.parent / "novig"))
+        from novig_lines import game_lines
+    except Exception as ex:
+        print(f"  ! novig lines unavailable ({type(ex).__name__})")
+        return {}
+
+    def code(name, short):
+        t = ODDS_NAMES.get(name) or (short or name.split()[0]).upper()
+        return TEAM_FIX.get(t, t)
+    out = {}
+    try:
+        games = game_lines("NFL")
+    except Exception as ex:
+        print(f"  ! novig lines failed: {type(ex).__name__}: {ex}")
+        return {}
+    for g in games:
+        h, a = code(g["home"], g["home_abbr"]), code(g["away"], g["away_abbr"])
+        out[(h, a)] = dict(
+            spread_line=-g["spread_home"] if g["spread_home"] is not None else np.nan,   # nflverse sign: home fav +
+            total_line=g["total"] if g["total"] is not None else np.nan,
+            ml_home=g["ml_home"] if g["ml_home"] is not None else np.nan,
+            ml_away=g["ml_away"] if g["ml_away"] is not None else np.nan)
+    print(f"  novig lines: {len(out)} games")
+    return out
+
+
 def fetch_odds():
+    """Novig first (free). The Odds API only fills games Novig doesn't have."""
+    out = fetch_novig_lines()
+    try:
+        extra = fetch_odds_api()
+    except Exception:
+        extra = {}
+    for k, v in extra.items():
+        if k not in out:
+            out[k] = v
+        else:
+            for f, x in v.items():
+                if pd.isna(out[k].get(f, np.nan)) and not pd.isna(x):
+                    out[k][f] = x
+    return out
+
+
+def fetch_odds_api():
     key = odds_key()
     if not key:
         return {}
