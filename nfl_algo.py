@@ -554,6 +554,34 @@ def _to_eastern(utc):
     return utc - pd.Timedelta(hours=4 if dst else 5)
 
 
+def _kicked_off(gameday, gametime):
+    """True once a game has started (ET). Started games keep the pick/line they had before kickoff."""
+    try:
+        ko = pd.Timestamp(f"{str(gameday)[:10]} {str(gametime)[:5]}")
+    except Exception:
+        return False
+    now_et = _to_eastern(pd.Timestamp.utcnow().tz_localize(None))
+    return ko <= now_et
+
+
+def _freeze_started(new, path, key_cols, started_ids):
+    """Rows for games that already kicked off come from the previous file (the pre-kickoff line + pick),
+    so a mid-game rerun can't swap in a closing line or re-pick a game that's being played."""
+    if not started_ids or not path.exists():
+        return new, 0
+    try:
+        old = pd.read_csv(path)
+    except Exception:
+        return new, 0
+    old_started = old[old.game_id.isin(started_ids)]
+    if old_started.empty:
+        return new, 0
+    keep_new = new[~new.game_id.isin(set(old_started.game_id))]
+    merged = pd.concat([old_started, keep_new], ignore_index=True)
+    merged = merged[[c for c in new.columns if c in merged.columns]]
+    return merged, int(old_started.game_id.nunique())
+
+
 def fetch_kickoffs(season, week):
     """{(home, away): (gameday_ET, 'HH:MM' ET, venue)} from ESPN's free scoreboard."""
     try:
@@ -915,6 +943,13 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
             "a_off_epa", "a_def_epa", "h_off_epa", "h_def_epa",
             "a_pass_mu", "a_rush_mu", "h_pass_mu", "h_rush_mu", "a_dline", "h_dline"]
     tag = f"{season}_wk{week:02d}"
+    started = {r.game_id for r in out.itertuples() if _kicked_off(r.gameday, r.gametime)}
+    frozen, n_fz = _freeze_started(out[keep], PICKS / f"{tag}.csv", ["game_id"], started)
+    if n_fz:
+        print(f"  {n_fz} game(s) already started: kept their pre-kickoff lines and picks")
+        out = out[~out.game_id.isin(started)]
+        out = pd.concat([frozen[frozen.game_id.isin(started)], out], ignore_index=True)
+        out = out.sort_values(["gameday", "gametime"]).reset_index(drop=True)
     out[keep].to_csv(PICKS / f"{tag}.csv", index=False)
 
     pr = None
@@ -926,6 +961,8 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
             qbs = {t: n for t, n in qbs.items() if isinstance(n, str)}
             pr = props.predict(wk, season, week, qbs, refresh_lines=refresh_lines, injuries=inj, frame=df)
             pr = intel_mod.annotate_props(pr, intel)
+            if started and len(pr):
+                pr, n_pz = _freeze_started(pr, PICKS / f"props_{tag}.csv", ["game_id"], started)
             pr.to_csv(PICKS / f"props_{tag}.csv", index=False)
             n_pk = int((pr.tier.fillna("") != "").sum()) if len(pr) else 0
             print(f"  {len(pr)} player props, {n_pk} plays -> picks/props_{tag}.csv")
