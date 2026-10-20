@@ -45,13 +45,22 @@ TD_MIN_PROB = 0.12     # (legacy) no TD picks under 12%
 # curve fit on our own graded weeks (refit every run), and TD plays only in the +100 to +250 range.
 TD_MIN_PRICE = 100     # no TD plays shorter than +100
 TD_MAX_PRICE = 250     # or longer than +250
-TD_CAL_DEFAULT = (0.17, 1.09)
+TD_CAL_DEFAULT = (0.0, 1.0)     # fair is already calibrated by the log-odds de-vig (TD_SHIFT)
 # Lotto TDs: just for fun, kept OUT of the main record. Top LOTTO_N longshots each week where the
 # model's TD % is highest relative to the market's. Longshots lose as a group (-11% on weeks 4-5),
 # so these are small-stake sprinkles with their own tracker, not plays.
 LOTTO_N = 5
 LOTTO_MIN_PRICE, LOTTO_MAX_PRICE = 300, 800   # (intercept, slope) on log-odds, half-strength version of the weeks 4-5 fit
-TD_HOLD = 1.20         # anytime-TD "Yes" prices carry ~20% hold
+TD_HOLD = 1.20         # OLD flat de-vig (kept only to convert old saved files)
+# Yes-only anytime-TD prices: strip the hold in log-odds, not as a flat %. Flat /1.20 took CMC -310 (75.6%)
+# down to 63%. Weeks 4-6 (893 lines vs results): log-odds shift 0.18 fit best (logloss .4197 vs .4201 flat),
+# and it's right on favorites: books' 70%+ -> hit 71%, shift says 72%, flat said 63%.
+TD_SHIFT = 0.18
+
+
+def td_yes_fair(p):
+    p = min(max(float(p), 0.005), 0.995)
+    return float(1 / (1 + np.exp(-(np.log(p / (1 - p)) - TD_SHIFT))))
 POS_CODE = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
 
 STAT_MAP_V1 = {  # short name -> nflverse column
@@ -337,23 +346,34 @@ def price_market(entry):
     books = entry["books"]
     dk = books.get(PRICE_BOOK, {})
     if "over" not in dk:
-        return None
+        nv = books.get("novig", {})
+        if "over" not in nv:
+            return None
+        line, over = nv["over"]
+        under = nv["under"][1] if "under" in nv and nv["under"][0] == line else None
+        return dict(line=float(line), over=float(over), under=float(under) if under is not None else None,
+                    fair_over=nv.get("mid"), n_fair=1 if nv.get("mid") is not None else 0, book="NOVIG")
     line, over = dk["over"]
     under = dk["under"][1] if "under" in dk and dk["under"][0] == line else None
     fair = []
     for b, v in books.items():
-        if b == PRICE_BOOK or "over" not in v or "under" not in v:
+        if b in (PRICE_BOOK, "novig") or "over" not in v or "under" not in v:
             continue
         if v["over"][0] == line and v["under"][0] == line:
             io, iu = am_to_prob(v["over"][1]), am_to_prob(v["under"][1])
             fair.append(io / (io + iu))
+    nv = books.get("novig", {})
+    if nv.get("mid") is not None and "over" in nv and nv["over"][0] == line:
+        fair.append(float(nv["mid"]))           # exchange price: no vig to strip
     fair_over = float(np.mean(fair)) if len(fair) >= MIN_FAIR_BOOKS else None
     if fair_over is None and line == 0.5 and under is None:
         # yes-only markets (anytime TD): other books' Yes prices with typical hold removed
         yes = [am_to_prob(v["over"][1]) for b, v in books.items()
-               if b != PRICE_BOOK and "over" in v and v["over"][0] == line]
+               if b not in (PRICE_BOOK, "novig") and "over" in v and v["over"][0] == line]
         if len(yes) >= MIN_FAIR_BOOKS:
-            fair_over = float(np.mean(yes)) / TD_HOLD
+            fair_over = td_yes_fair(float(np.mean(yes)))
+            if nv.get("mid") is not None and "over" in nv and nv["over"][0] == line:
+                fair_over = (fair_over + float(nv["mid"])) / 2      # exchange Yes/No mid: no vig at all
     return dict(line=float(line), over=float(over), under=float(under) if under is not None else None,
                 fair_over=fair_over, n_fair=len(fair), book="DK")
 
@@ -382,7 +402,7 @@ REFETCH_WITHIN_H = 30   # games kicking off within this many hours get fresh lin
 REFETCH_AFTER_H = 12    # ...if the saved ones are older than this
 
 
-def fetch_prop_lines(season, week, games, refresh=False):
+def _fetch_dk_lines(season, week, games, refresh=False):
     """{(name_key, mkt): {"books": {book: {over: (pt, price), under: (pt, price)}}}}. Cached per week.
 
     Books post props a few games at a time during the week, so a Tuesday pull only has some games.
@@ -399,15 +419,15 @@ def fetch_prop_lines(season, week, games, refresh=False):
     if not key:
         if not lines:
             print("  (no Odds API key found: props show projections only, no picks)")
-        return to_tuple(lines)
+        return lines
     try:
         r = requests.get(f"{ODDS_BASE}/events", params={"apiKey": key}, timeout=30)   # free call
     except Exception as ex:
         print(f"  ! odds api events: {ex}")
-        return to_tuple(lines)
+        return lines
     if r.status_code != 200:
         print(f"  ! odds api events {r.status_code}: {r.text[:120]}")
-        return to_tuple(lines)
+        return lines
     want = {(h, a) for h, a in zip(games.home_team, games.away_team)}
     events = [e for e in r.json()
               if (nfl.ODDS_NAMES.get(e["home_team"]), nfl.ODDS_NAMES.get(e["away_team"])) in want]
@@ -427,6 +447,9 @@ def fetch_prop_lines(season, week, games, refresh=False):
         rr = requests.get(f"{ODDS_BASE}/events/{ev['id']}/odds", timeout=30, params=dict(
             apiKey=key, regions="us", markets=",".join(v[0] for v in MARKETS.values()), oddsFormat="american"))
         used = rr.headers.get("x-requests-remaining", used)
+        if rr.status_code == 401:
+            print("  odds api: out of credits this month -> props priced off Novig instead")
+            break
         if rr.status_code != 200:
             print(f"  ! props {ev['away_team']} @ {ev['home_team']}: {rr.status_code}")
             continue
@@ -446,7 +469,50 @@ def fetch_prop_lines(season, week, games, refresh=False):
     games_with = sum(1 for v in meta.values() if v.get("n", 0) > 0)
     print(f"  prop lines: {len(lines)} player-markets | {games_with}/{len(events)} games have props"
           + f" | pulled {pulled} games this run" + (f" | odds api credits left: {used}" if used else ""))
-    return to_tuple(lines)
+    return lines
+
+
+NOVIG_CACHE_H = 3     # re-pull Novig props at most every 3 hours
+
+
+def _fetch_novig_props(season, week, refresh=False):
+    """Novig exchange player props (free): {'name_key|mkt': {'line','over','under','fair_over'}}."""
+    import time as _t
+    f = nfl.DATA / f"props_novig_{season}_wk{week:02d}.json"
+    if f.exists() and not refresh and _t.time() - f.stat().st_mtime < NOVIG_CACHE_H * 3600:
+        return json.loads(f.read_text())
+    try:
+        import sys as _s
+        _s.path.insert(0, str(nfl.ROOT.parent / "novig"))
+        from novig_lines import player_props
+        raw = player_props("NFL")
+    except Exception as ex:
+        print(f"  ! novig props: {type(ex).__name__}: {ex}")
+        return json.loads(f.read_text()) if f.exists() else {}
+    out = {f"{name_key(p)}|{m}": v for (p, m), v in raw.items()}
+    nfl.DATA.mkdir(exist_ok=True)
+    f.write_text(json.dumps(out))
+    print(f"  novig props: {len(out)} player-markets")
+    return out
+
+
+def fetch_prop_lines(season, week, games, refresh=False):
+    """DraftKings (Odds API) when there are credits, plus Novig's exchange props (free) for every player.
+    The DK line is what gets priced when it exists; otherwise the Novig line/price is used."""
+    lines = _fetch_dk_lines(season, week, games, refresh)
+    nv = _fetch_novig_props(season, week, refresh)
+    for k, v in nv.items():
+        e = lines.setdefault(k, {"books": {}})
+        e.setdefault("books", {})
+        e["books"]["novig"] = {"over": (v["line"], v["over"]) if v.get("over") is not None else None,
+                               "under": (v["line"], v["under"]) if v.get("under") is not None else None,
+                               "mid": v.get("fair_over")}
+        for side in ("over", "under"):
+            if e["books"]["novig"][side] is None:
+                e["books"]["novig"].pop(side)
+    n_dk = sum(1 for v in lines.values() if "draftkings" in v.get("books", {}))
+    print(f"  prop lines: {n_dk} with DraftKings, {len(nv)} from Novig")
+    return {tuple(k.split("|")): v for k, v in lines.items()}
 
 
 # ----------------------------------------------------------------------------
@@ -503,7 +569,10 @@ def td_calibration(season, week, st):
         if wk_ >= week:
             continue
         d = pd.read_csv(f)
-        d = d[(d.market == "atd") & d.fair.notna()][["player_id", "fair"]].assign(week=wk_)
+        d = d[(d.market == "atd") & d.fair.notna()].copy()
+        if "fair_v" not in d or d.fair_v.isna().all():      # saved before the log-odds de-vig: convert
+            d["fair"] = d.fair.map(lambda f: td_yes_fair(min(f * TD_HOLD, 0.99)))
+        d = d[["player_id", "fair"]].assign(week=wk_)
         rows.append(d)
     if not rows:
         return TD_CAL_DEFAULT
@@ -526,6 +595,69 @@ def td_prob(fair, cal):
     return float(1 / (1 + np.exp(-(a + b * np.log(f / (1 - f))))))
 
 
+# ----------------------------------------------------------------------------
+# INJURY BOT: a ruled-out player's work goes to his healthy teammates
+# ----------------------------------------------------------------------------
+REALLOC = True
+RUSH_COLS = ["car_pg", "ryd_pg", "rtd_pg", "rz_car_pg", "rz_car_sh"]
+REC_COLS = ["tgt_pg", "rec_pg", "recyd_pg", "rectd_pg", "ayd_pg", "tsh_pg", "ays_pg", "wopr_pg", "rz_tgt_pg", "rz_tgt_sh"]
+
+
+def reallocate(df, gone, st):
+    """Carries -> healthy RBs, targets -> healthy WR/TE/RB (same position weighted 2x), in proportion to what each
+    already gets. Only the part not already in teammates' averages moves: f = share of the team's games the missing
+    player actually played (games he already missed are baked into everyone's numbers).
+    Backtest (TD model, 2024-26): players handed 4+ touches scored 34.3%; without this we said 26.9%, with it 34.0%."""
+    df = df.copy()
+    df["inj_boost"] = 0.0
+    if gone is None or gone.empty:
+        return df
+    for c in RUSH_COLS + REC_COLS + ["l1_car", "l1_tgt", "tdany_pg"]:
+        if c in df:
+            df[c] = df[c].astype(float)
+    cur = st[st.season == nfl.CURRENT_SEASON]
+    team_gp = cur.groupby("team").week.nunique().to_dict()
+    for g in gone.itertuples():
+        gp = getattr(g, "gp", 0) or 0
+        if not gp or g.team not in team_gp or pd.isna(gp):
+            continue
+        f = min(gp / max(team_gp[g.team], 1), 1.0)
+        mates = df.team == g.team
+        rb = mates & (df.position == "RB")
+        rec = mates & df.position.isin(["RB", "WR", "TE"])
+        car = getattr(g, "car_pg", 0) or 0
+        tgt = getattr(g, "tgt_pg", 0) or 0
+        if rb.any() and car > 0:
+            w = df.loc[rb, "car_pg"].fillna(0) + 0.3
+            w = w / w.sum()
+            for c in RUSH_COLS:
+                v = getattr(g, c, np.nan)
+                if c in df and pd.notna(v):
+                    df.loc[rb, c] = df.loc[rb, c].fillna(0) + f * v * w
+            if pd.notna(getattr(g, "l1_car", np.nan)):
+                df.loc[rb, "l1_car"] = df.loc[rb, "l1_car"].fillna(0) + g.l1_car * w
+            df.loc[rb, "tdany_pg"] = df.loc[rb, "tdany_pg"].fillna(0) + f * (getattr(g, "rtd_pg", 0) or 0) * w
+            df.loc[rb, "inj_boost"] += f * car * w
+        if rec.any() and tgt > 0:
+            w = (df.loc[rec, "tgt_pg"].fillna(0) + 0.3) * np.where(df.loc[rec, "position"] == g.position, 2.0, 1.0)
+            w = w / w.sum()
+            for c in REC_COLS:
+                v = getattr(g, c, np.nan)
+                if c in df and pd.notna(v):
+                    df.loc[rec, c] = df.loc[rec, c].fillna(0) + f * v * w
+            if pd.notna(getattr(g, "l1_tgt", np.nan)):
+                df.loc[rec, "l1_tgt"] = df.loc[rec, "l1_tgt"].fillna(0) + g.l1_tgt * w
+            df.loc[rec, "tdany_pg"] = df.loc[rec, "tdany_pg"].fillna(0) + f * (getattr(g, "rectd_pg", 0) or 0) * w
+            df.loc[rec, "inj_boost"] += f * tgt * w
+    for c in ("rz_car_sh", "rz_tgt_sh", "tsh_pg", "ays_pg"):
+        if c in df:
+            df[c] = df[c].clip(upper=1.0)
+    boosted = df[df.inj_boost >= 1.5].sort_values("inj_boost", ascending=False)
+    if len(boosted):
+        print("  injury bot: " + ", ".join(f"{r.player_display_name} +{r.inj_boost:.1f}" for r in boosted.head(8).itertuples()))
+    return df
+
+
 def predict(wk, season, week, starters, refresh_lines=False, injuries=None, frame=None):
     bundle = joblib.load(nfl.MODELS / "props_bundle.joblib")
     frame = nfl.LAST_FRAME if frame is None else frame
@@ -539,6 +671,11 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
     cand = cand[~status.isin(["Out", "Doubtful"])].copy()
     cand["inj"] = status[cand.index].fillna("")
     df = build_rows(st, frame, cand)
+    if REALLOC and len(dropped):
+        try:
+            df = reallocate(df, build_rows(st, frame, dropped), st)
+        except Exception as ex:
+            print(f"  ! injury bot skipped ({type(ex).__name__}: {ex})")
     lines = fetch_prop_lines(season, week, wk, refresh_lines)
     hist = st[st.season == season]
 
@@ -579,6 +716,7 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
             ln = price_market(raw_ln) if raw_ln else None
             rec = dict(game_id=r.game_id, team=r.team, opp=r.opp, player=r.player_display_name, inj=r.inj,
                        player_id=r.player_id, position=r.position, market=mkt, label=label,
+                       inj_boost=float(getattr(r, "inj_boost", 0) or 0),
                        proj=float(r.proj), wx_mult=float(r.wx_mult), line=np.nan, over_price=np.nan, under_price=np.nan,
                        p_over=np.nan, side="", pick="", price=np.nan, edge=np.nan, tier="", hits="",
                        book="", fair=np.nan, vs_mkt="", ev=np.nan)
@@ -588,6 +726,7 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                 if mkt == "atd":
                     # market-first: no fair price from other books = no TD play
                     po = td_prob(ln["fair_over"], td_cal) * float(r.wx_mult) if ln["fair_over"] is not None else None
+                    rec["td_pct"] = po if po is not None else np.nan     # site 'TD odds' board
                 else:
                     po = p_over(bundle, mkt, r.proj, ln["line"])
                 if po is None:
@@ -610,6 +749,7 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                     tier_, rec["vs_mkt"] = "", "price range"
                 if mkt == "atd":
                     rec["fair"] = ln["fair_over"]
+                    rec["fair_v"] = 2
                     if tier_ == "HAMMER":           # new approach: no max-confidence TD plays yet
                         tier_ = "PLAY"
                 elif ln["fair_over"] is not None:

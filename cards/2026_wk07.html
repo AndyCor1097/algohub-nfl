@@ -1,0 +1,2663 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AlgoHub NFL Week 7</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0e13;--card:#12161d;--card2:#171c25;--line:#222a35;--tx:#e6edf3;--mu:#7d8590;
+--lean:#58a6ff;--play:#3fb950;--ham:#f2b134;--neg:#f85149}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font:14px/1.4 Inter,system-ui,sans-serif;padding:28px 16px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+.num,.proj,.cols span,.top h1,.stats b,.wplab,.sval,.pick{font-family:"Barlow Condensed",sans-serif}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px}
+.top .k{color:var(--mu);font-size:12px;letter-spacing:.18em;font-weight:600}
+.top h1{font-size:44px;font-weight:800;letter-spacing:.02em;line-height:1}
+.stats{display:flex;gap:22px} .stats div{text-align:right} .stats small{display:block;color:var(--mu);font-size:11px;letter-spacing:.14em}
+.stats b{font-size:30px} .stats .h b{color:var(--ham)} .stats .p b{color:var(--play)}
+.tabs{display:flex;gap:6px;margin:18px 0 6px;flex-wrap:wrap}
+.tabs button{background:transparent;border:1px solid var(--line);color:var(--mu);padding:7px 14px;border-radius:999px;font:600 12px Inter,system-ui,sans-serif;letter-spacing:.08em;cursor:pointer}
+.tabs button.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;margin:26px 0 12px}
+.dayhead h2{font:700 13px Inter,system-ui,sans-serif;letter-spacing:.16em} .dayhead span{color:var(--mu);font-size:11px;letter-spacing:.14em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;border-top:3px solid var(--line)}
+.card.b-lean{border-top-color:var(--lean)} .card.b-play{border-top-color:var(--play)}
+.card.b-hammer{border-top-color:var(--ham);box-shadow:0 0 0 1px rgba(242,177,52,.25),0 8px 30px rgba(242,177,52,.08)}
+.meta{display:flex;justify-content:space-between;gap:10px;padding:11px 16px;color:var(--mu);font-size:11px;letter-spacing:.08em;border-bottom:1px solid var(--line)}
+.meta span:last-child{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.badge{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font:800 13px "Barlow Condensed";letter-spacing:.04em;flex:none}
+.tname{flex:1;min-width:0} .tname b{display:block;font-size:16px;font-weight:600} .tname small{color:var(--mu);font-size:12px}
+.proj{font-size:32px;font-weight:700;color:var(--mu)} .team.fav .proj{color:var(--tx)}
+.wp{padding:6px 16px 14px} .wplab{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:6px}
+.wplab .cap{color:var(--mu);font:600 10px Inter,system-ui,sans-serif;letter-spacing:.16em;align-self:center}
+.wpbar{display:flex;height:8px;border-radius:99px;overflow:hidden;gap:2px;background:var(--line)} .wpbar i{display:block;height:100%}
+.mkt{border-top:1px solid var(--line);padding:12px 16px;background:var(--card2)}
+.mlabel{color:var(--mu);font:600 10px Inter,system-ui,sans-serif;letter-spacing:.18em;margin-bottom:8px} .mlabel em{font-style:normal;letter-spacing:.04em;opacity:.7}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px} .cols small{display:block;color:var(--mu);font-size:10px;letter-spacing:.14em}
+.cols span{font-size:20px;font-weight:700} .edge span{color:var(--mu)} .edge.hot span{color:var(--tx);font-size:26px}
+.pick{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;letter-spacing:.02em}
+.pick .tier{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.14em;padding:4px 8px;border-radius:6px;color:#0b0e13}
+.t-lean .tier{background:var(--lean)} .t-play .tier{background:var(--play)} .t-hammer .tier{background:var(--ham)}
+.t-hammer{color:var(--ham)} .pick.none{color:#4b535d;font:600 12px Inter,system-ui,sans-serif;letter-spacing:.16em}
+.ml{border-top:1px solid var(--line);padding:10px 16px;font-size:12px;color:var(--mu);letter-spacing:.06em;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ml b{color:var(--play);font-size:14px}
+.strip{border-top:1px solid var(--line);padding:12px 16px}
+.srow{display:grid;grid-template-columns:1fr 90px 46px;align-items:center;gap:10px;font-size:12px;padding:3px 0}
+.slab em{color:var(--mu);font-style:normal}
+.sbar{position:relative;height:6px;background:var(--line);border-radius:99px}
+.sbar::after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:12px;background:var(--mu)}
+.sbar i{position:absolute;top:0;height:100%;border-radius:99px} .sbar i.pos{left:50%;background:var(--play)} .sbar i.neg{right:50%;background:var(--neg)}
+.sval{text-align:right;font-size:15px;font-weight:700} .sval.pos{color:var(--play)} .sval.neg{color:var(--neg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px}
+.chip{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.1em;color:#c9d1d9;border:1px solid var(--line);background:#0f1319;padding:4px 8px;border-radius:6px}
+.stats .pp b{color:var(--lean)}
+.ptoggle{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-top:1px solid var(--line);
+background:#0f1319;color:var(--tx);padding:13px 16px;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.16em;cursor:pointer}
+.ptoggle:hover{background:#141a22} .ptoggle em{font-style:normal;color:var(--play);margin-left:8px}
+.ptoggle .car{transition:transform .2s;color:var(--mu)} .ptoggle[aria-expanded="true"] .car{transform:rotate(180deg)}
+.props{border-top:1px solid var(--line);padding:6px 0 8px;background:#0f1319}
+.pfilt{display:flex;gap:5px;flex-wrap:wrap;padding:6px 16px 8px}
+.pfilt button{background:transparent;border:1px solid var(--line);color:var(--mu);border-radius:999px;padding:4px 9px;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.1em;cursor:pointer}
+.pfilt button.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:5px;padding:10px 16px;border-top:1px solid #1a2029}
+.pl{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .pl b{font-size:14px;font-weight:600} .pl small{color:var(--mu);font-size:11px}
+.pm{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--mu);font-size:10px;letter-spacing:.08em}
+.pm b{color:var(--tx);font:700 13px "Barlow Condensed",sans-serif;letter-spacing:.02em}
+.pm .mk{color:#c9d1d9;font-weight:700;letter-spacing:.12em}
+.ptier{flex:none;display:flex;align-items:center;gap:7px;font:700 17px "Barlow Condensed",sans-serif;white-space:nowrap}
+.ptier i{font:800 9px Inter,system-ui,sans-serif;font-style:normal;letter-spacing:.12em;padding:3px 6px;border-radius:5px;color:#0b0e13}
+.ptier small{color:var(--mu);font-size:12px}
+.ptier.t-lotto i{background:#bc8cff} .ptier.t-lotto{color:#d2b4ff}
+.ptier.t-lean i{background:var(--lean)} .ptier.t-play i{background:var(--play)} .ptier.t-hammer i{background:var(--ham)} .ptier.t-hammer{color:var(--ham)}
+.pnone{flex:none;color:#4b535d;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.14em}
+.q{font:800 9px Inter,system-ui,sans-serif;color:#0b0e13;background:var(--ham);padding:2px 4px;border-radius:4px;vertical-align:2px}
+.chip.inj{color:#ffb4ab;border-color:#5a2a27;background:#1d1212}
+.dlab{margin-top:12px} .dline{display:flex;gap:10px;font-size:12px;padding:3px 0;align-items:baseline}
+.dline b{flex:none;width:52px;font-weight:600} .dline span{color:#c9d1d9;font:600 13px "Barlow Condensed",sans-serif;letter-spacing:.04em}
+.cov{font:700 10px Inter,system-ui,sans-serif;letter-spacing:.08em;padding:1px 6px;border-radius:5px;border:1px solid var(--line);color:#c9d1d9}
+.cov.ok{color:var(--play);border-color:#1f4d2b;background:#0f1d14} .cov.bad{color:var(--neg);border-color:#5a2a27;background:#1d1212}
+.pproj{flex:none;font:700 18px "Barlow Condensed",sans-serif;color:var(--mu)}
+.foot{color:var(--mu);font-size:11px;margin-top:30px;letter-spacing:.06em}
+.hide,.prow[data-hide="1"]{display:none}
+</style></head><body><div class="wrap">
+  <div class="top">
+    <div><div class="k">THE ALGOHUB · NFL GAME ALGO · 2026</div><h1>WEEK 7</h1></div>
+    <div class="stats">
+      <div><small>GAMES</small><b>14</b></div>
+      <div class="p"><small>PLAYS</small><b>13</b></div>
+      <div class="h"><small>HAMMERS</small><b>0</b></div>
+      
+    </div>
+  </div>
+  <div class="tabs"><button class="on" data-f="all">ALL</button><button data-f="plays">PLAYS ONLY</button><button data-f="THU">THU</button><button data-f="SUN">SUN</button><button data-f="MON">MON</button></div>
+  
+  <section class="day" data-day="THU">
+    <div class="dayhead"><h2>THURSDAY, OCTOBER 22</h2><span>1 GAME</span></div>
+    <div class="grid">
+    <article class="card b-lean" data-day="THU" data-play="1" data-rank="1">
+      <header class="meta"><span>THU · 8:15 PM ET</span><span>Soldier Field</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#002244;color:#fff">NE</span>
+        <div class="tname"><b>Patriots</b><small>4-2 · Drake Maye</small></div>
+        <div class="proj">23.3</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0B162A;color:#fff">CHI</span>
+        <div class="tname"><b>Bears</b><small>4-2 · Caleb Williams</small></div>
+        <div class="proj">24.9</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>NE 45%</span><span class="cap">WIN PROB</span><span>CHI 55%</span></div>
+        <div class="wpbar"><i style="width:45.4%;background:#002244"></i><i style="width:54.6%;background:#0B162A"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>NE -1.5</span></div>
+          <div><small>MODEL</small><span>CHI -1.6</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.1</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>CHI +1.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>50.5</span></div>
+          <div><small>MODEL</small><span>48.3</span></div>
+          <div class="edge "><small>EDGE</small><span>2.2</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">NE PASS O <em>vs</em> CHI D</span>
+            <span class="sbar"><i class="pos" style="width:3.5%"></i></span>
+            <span class="sval pos">+0.02</span></div>
+          <div class="srow"><span class="slab">NE RUSH O <em>vs</em> CHI D</span>
+            <span class="sbar"><i class="pos" style="width:0.5%"></i></span>
+            <span class="sval pos">+0.00</span></div>
+          <div class="srow"><span class="slab">CHI PASS O <em>vs</em> NE D</span>
+            <span class="sbar"><i class="pos" style="width:4.0%"></i></span>
+            <span class="sval pos">+0.02</span></div>
+          <div class="srow"><span class="slab">CHI RUSH O <em>vs</em> NE D</span>
+            <span class="sbar"><i class="neg" style="width:0.2%"></i></span>
+            <span class="sval neg">-0.00</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>NE D</b><span>MAN 31% · C3 · PRESS 30% · BLITZ 35%</span></div><div class="dline"><b>CHI D</b><span>MAN 43% · C1 · PRESS 27% · BLITZ 42%</span></div></div>
+      <div class="chips"><span class="chip">NE SHORT WEEK</span><span class="chip">CHI SHORT WEEK</span><span class="chip">60°F · 4 MPH</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Drake Maye</b> <small>QB · NE</small></div>
+            <span class="pproj">235.7</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>235.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Rhamondre Stevenson</b> <small>RB · NE</small></div>
+            <span class="pproj">44.5</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>44.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Corey Kiner</b> <small>RB · NE</small></div>
+            <span class="pproj">27.4</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>27.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>A.J. Brown</b> <small>WR · NE</small></div>
+            <span class="pproj">41.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>41.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Mack Hollins</b> <small>WR · NE</small></div>
+            <span class="pproj">39.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>39.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.9</b></span><span>ZONE <b>9.5</b></span><span class="cov ">COV -4%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>DeMario Douglas</b> <small>WR · NE</small></div>
+            <span class="pproj">38.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>38.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.5</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Hunter Henry</b> <small>TE · NE</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.4</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV -4%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>A.J. Brown</b> <small>WR · NE</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>DeMario Douglas</b> <small>WR · NE</small></div>
+            <span class="pproj">3.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.5</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Rhamondre Stevenson</b> <small>RB · NE</small></div>
+            <span class="pproj">35%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>35%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Hunter Henry</b> <small>TE · NE</small></div>
+            <span class="pproj">28%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>28%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>A.J. Brown</b> <small>WR · NE</small></div>
+            <span class="pproj">24%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>24%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Caleb Williams</b> <small>QB · CHI</small></div>
+            <span class="pproj">258.0</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>258.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Kyle Monangai</b> <small>RB · CHI</small></div>
+            <span class="pproj">53.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>53.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>D&#x27;Andre Swift</b> <small>RB · CHI</small></div>
+            <span class="pproj">51.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>51.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Luther Burden III</b> <small>WR · CHI</small></div>
+            <span class="pproj">53.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>53.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Rome Odunze</b> <small>WR · CHI</small></div>
+            <span class="pproj">51.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>51.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.2</b></span><span>ZONE <b>7.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Colston Loveland</b> <small>TE · CHI</small></div>
+            <span class="pproj">43.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>43.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Luther Burden III</b> <small>WR · CHI</small></div>
+            <span class="pproj">4.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Colston Loveland</b> <small>TE · CHI</small></div>
+            <span class="pproj">3.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Rome Odunze</b> <small>WR · CHI</small></div>
+            <span class="pproj">3.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.2</b></span><span>ZONE <b>7.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>D&#x27;Andre Swift</b> <small>RB · CHI</small></div>
+            <span class="pproj">47%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>47%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Kyle Monangai</b> <small>RB · CHI</small></div>
+            <span class="pproj">43%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>43%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Rome Odunze</b> <small>WR · CHI</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article></div>
+  </section>
+  <section class="day" data-day="SUN">
+    <div class="dayhead"><h2>SUNDAY, OCTOBER 25</h2><span>12 GAMES</span></div>
+    <div class="grid">
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · 9:30 AM ET</span><span>Stade de France</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#FFB612;color:#000">PIT</span>
+        <div class="tname"><b>Steelers</b><small>4-2 · Aaron Rodgers</small></div>
+        <div class="proj">23.2</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#D3BC8D;color:#000">NO</span>
+        <div class="tname"><b>Saints</b><small>2-4 · Tyler Shough</small></div>
+        <div class="proj">21.1</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>PIT 56%</span><span class="cap">WIN PROB</span><span>NO 44%</span></div>
+        <div class="wpbar"><i style="width:56.1%;background:#FFB612"></i><i style="width:43.9%;background:#D3BC8D"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>PIT -3.5</span></div>
+          <div><small>MODEL</small><span>PIT -2.1</span></div>
+          <div class="edge "><small>EDGE</small><span>1.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>43.5</span></div>
+          <div><small>MODEL</small><span>44.3</span></div>
+          <div class="edge "><small>EDGE</small><span>0.8</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">PIT PASS O <em>vs</em> NO D</span>
+            <span class="sbar"><i class="neg" style="width:12.0%"></i></span>
+            <span class="sval neg">-0.07</span></div>
+          <div class="srow"><span class="slab">PIT RUSH O <em>vs</em> NO D</span>
+            <span class="sbar"><i class="pos" style="width:17.3%"></i></span>
+            <span class="sval pos">+0.10</span></div>
+          <div class="srow"><span class="slab">NO PASS O <em>vs</em> PIT D</span>
+            <span class="sbar"><i class="neg" style="width:19.0%"></i></span>
+            <span class="sval neg">-0.11</span></div>
+          <div class="srow"><span class="slab">NO RUSH O <em>vs</em> PIT D</span>
+            <span class="sbar"><i class="neg" style="width:2.4%"></i></span>
+            <span class="sval neg">-0.01</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>PIT D</b><span>MAN 36% · C3 · PRESS 29% · BLITZ 26%</span></div><div class="dline"><b>NO D</b><span>MAN 22% · C3 · PRESS 28% · BLITZ 34%</span></div></div>
+      <div class="chips"><span class="chip">DOME</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Aaron Rodgers</b> <small>QB · PIT</small></div>
+            <span class="pproj">256.5</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>256.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jaylen Warren</b> <small>RB · PIT</small></div>
+            <span class="pproj">66.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>66.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Rico Dowdle</b> <small>RB · PIT</small></div>
+            <span class="pproj">35.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>35.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>DK Metcalf</b> <small>WR · PIT</small></div>
+            <span class="pproj">60.1</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>60.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>9.2</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Germie Bernard</b> <small>WR · PIT</small></div>
+            <span class="pproj">49.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>49.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Pat Freiermuth</b> <small>TE · PIT</small></div>
+            <span class="pproj">38.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>38.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>DK Metcalf</b> <small>WR · PIT</small></div>
+            <span class="pproj">4.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>9.2</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Germie Bernard</b> <small>WR · PIT</small></div>
+            <span class="pproj">4.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Pat Freiermuth</b> <small>TE · PIT</small></div>
+            <span class="pproj">3.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jaylen Warren</b> <small>RB · PIT</small></div>
+            <span class="pproj">46%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>46%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>DK Metcalf</b> <small>WR · PIT</small></div>
+            <span class="pproj">33%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>33%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Pat Freiermuth</b> <small>TE · PIT</small></div>
+            <span class="pproj">26%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>26%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Tyler Shough</b> <small>QB · NO</small></div>
+            <span class="pproj">216.2</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>216.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Kendre Miller</b> <small>RB · NO</small></div>
+            <span class="pproj">39.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>39.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Travis Etienne</b> <small>RB · NO</small></div>
+            <span class="pproj">35.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>35.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Chris Olave</b> <small>WR · NO</small></div>
+            <span class="pproj">65.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>65.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Devaughn Vele</b> <small>WR · NO</small></div>
+            <span class="pproj">53.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>53.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.2</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Juwan Johnson</b> <small>TE · NO</small></div>
+            <span class="pproj">35.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>35.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.9</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Chris Olave</b> <small>WR · NO</small></div>
+            <span class="pproj">5.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Devaughn Vele</b> <small>WR · NO</small></div>
+            <span class="pproj">4.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.2</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Juwan Johnson</b> <small>TE · NO</small></div>
+            <span class="pproj">3.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.9</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Chris Olave</b> <small>WR · NO</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Kendre Miller</b> <small>RB · NO</small></div>
+            <span class="pproj">28%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>28%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Travis Etienne</b> <small>RB · NO</small></div>
+            <span class="pproj">27%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>27%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>M&amp;T Bank Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#FB4F14;color:#000">CIN</span>
+        <div class="tname"><b>Bengals</b><small>3-2 · Joe Burrow</small></div>
+        <div class="proj">23.5</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#241773;color:#fff">BAL</span>
+        <div class="tname"><b>Ravens</b><small>4-2 · Tyler Huntley</small></div>
+        <div class="proj">26.6</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>CIN 41%</span><span class="cap">WIN PROB</span><span>BAL 59%</span></div>
+        <div class="wpbar"><i style="width:41.0%;background:#FB4F14"></i><i style="width:59.0%;background:#241773"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>BAL -2.5</span></div>
+          <div><small>MODEL</small><span>BAL -3.1</span></div>
+          <div class="edge "><small>EDGE</small><span>0.6</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>50.5</span></div>
+          <div><small>MODEL</small><span>50.0</span></div>
+          <div class="edge "><small>EDGE</small><span>0.5</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">CIN PASS O <em>vs</em> BAL D</span>
+            <span class="sbar"><i class="pos" style="width:10.3%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">CIN RUSH O <em>vs</em> BAL D</span>
+            <span class="sbar"><i class="neg" style="width:6.0%"></i></span>
+            <span class="sval neg">-0.04</span></div>
+          <div class="srow"><span class="slab">BAL PASS O <em>vs</em> CIN D</span>
+            <span class="sbar"><i class="pos" style="width:10.8%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">BAL RUSH O <em>vs</em> CIN D</span>
+            <span class="sbar"><i class="pos" style="width:10.5%"></i></span>
+            <span class="sval pos">+0.06</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>CIN D</b><span>MAN 36% · C3 · PRESS 30% · BLITZ 16%</span></div><div class="dline"><b>BAL D</b><span>MAN 32% · C3 · PRESS 28% · BLITZ 31%</span></div></div>
+      <div class="chips"><span class="chip">CIN OFF BYE</span><span class="chip">65°F · 6 MPH</span><span class="chip">DIVISION</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Joe Burrow</b> <small>QB · CIN</small></div>
+            <span class="pproj">268.1</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>268.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Chase Brown</b> <small>RB · CIN</small></div>
+            <span class="pproj">61.4</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>61.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Samaje Perine</b> <small>RB · CIN</small></div>
+            <span class="pproj">33.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>33.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tee Higgins</b> <small>WR · CIN</small></div>
+            <span class="pproj">69.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>69.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.6</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Ja&#x27;Marr Chase</b> <small>WR · CIN</small></div>
+            <span class="pproj">60.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>60.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Mitchell Tinsley</b> <small>WR · CIN</small></div>
+            <span class="pproj">36.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>36.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>6.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Ja&#x27;Marr Chase</b> <small>WR · CIN</small></div>
+            <span class="pproj">5.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tee Higgins</b> <small>WR · CIN</small></div>
+            <span class="pproj">4.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.6</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Chase Brown</b> <small>RB · CIN</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.7</b></span><span>ZONE <b>5.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Chase Brown</b> <small>RB · CIN</small></div>
+            <span class="pproj">43%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>43%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Ja&#x27;Marr Chase</b> <small>WR · CIN</small></div>
+            <span class="pproj">36%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>36%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tee Higgins</b> <small>WR · CIN</small></div>
+            <span class="pproj">35%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>35%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Tyler Huntley</b> <small>QB · BAL</small></div>
+            <span class="pproj">181.6</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>181.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Derrick Henry</b> <small>RB · BAL</small></div>
+            <span class="pproj">90.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>90.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Lamar Jackson</b> <small>QB · BAL</small></div>
+            <span class="pproj">24.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>24.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Zay Flowers</b> <small>WR · BAL</small></div>
+            <span class="pproj">73.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>73.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.2</b></span><span>ZONE <b>9.2</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Mark Andrews</b> <small>TE · BAL</small></div>
+            <span class="pproj">43.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>43.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.1</b></span><span>ZONE <b>7.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Rashod Bateman</b> <small>WR · BAL</small></div>
+            <span class="pproj">31.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>31.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.1</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Zay Flowers</b> <small>WR · BAL</small></div>
+            <span class="pproj">5.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.2</b></span><span>ZONE <b>9.2</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Mark Andrews</b> <small>TE · BAL</small></div>
+            <span class="pproj">3.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.1</b></span><span>ZONE <b>7.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Ja&#x27;Kobi Lane</b> <small>WR · BAL</small></div>
+            <span class="pproj">2.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Derrick Henry</b> <small>RB · BAL</small></div>
+            <span class="pproj">59%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>59%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Zay Flowers</b> <small>WR · BAL</small></div>
+            <span class="pproj">38%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>38%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Mark Andrews</b> <small>TE · BAL</small></div>
+            <span class="pproj">28%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>28%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>Nissan Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#FF3C00;color:#000">CLE</span>
+        <div class="tname"><b>Browns</b><small>4-2 · Deshaun Watson</small></div>
+        <div class="proj">21.1</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0C2340;color:#4B92DB">TEN</span>
+        <div class="tname"><b>Titans</b><small>1-5 · Cam Ward</small></div>
+        <div class="proj">21.2</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>CLE 50%</span><span class="cap">WIN PROB</span><span>TEN 50%</span></div>
+        <div class="wpbar"><i style="width:49.6%;background:#FF3C00"></i><i style="width:50.4%;background:#0C2340"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>TEN -1.5</span></div>
+          <div><small>MODEL</small><span>TEN -0.1</span></div>
+          <div class="edge "><small>EDGE</small><span>1.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>38.5</span></div>
+          <div><small>MODEL</small><span>42.3</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.8</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>OVER 38.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">CLE PASS O <em>vs</em> TEN D</span>
+            <span class="sbar"><i class="pos" style="width:7.6%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">CLE RUSH O <em>vs</em> TEN D</span>
+            <span class="sbar"><i class="neg" style="width:17.2%"></i></span>
+            <span class="sval neg">-0.10</span></div>
+          <div class="srow"><span class="slab">TEN PASS O <em>vs</em> CLE D</span>
+            <span class="sbar"><i class="neg" style="width:29.4%"></i></span>
+            <span class="sval neg">-0.18</span></div>
+          <div class="srow"><span class="slab">TEN RUSH O <em>vs</em> CLE D</span>
+            <span class="sbar"><i class="neg" style="width:4.0%"></i></span>
+            <span class="sval neg">-0.02</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>CLE D</b><span>MAN 41% · C1 · PRESS 35% · BLITZ 24%</span></div><div class="dline"><b>TEN D</b><span>MAN 26% · C2 · PRESS 30% · BLITZ 23%</span></div></div>
+      <div class="chips"><span class="chip">74°F · 3 MPH</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Deshaun Watson</b> <small>QB · CLE</small></div>
+            <span class="pproj">214.5</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>214.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Quinshon Judkins</b> <small>RB · CLE</small></div>
+            <span class="pproj">59.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>59.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Deshaun Watson</b> <small>QB · CLE</small></div>
+            <span class="pproj">36.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>36.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Denzel Boston</b> <small>WR · CLE</small></div>
+            <span class="pproj">55.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>55.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>KC Concepcion</b> <small>WR · CLE</small></div>
+            <span class="pproj">43.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>43.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Harold Fannin Jr.</b> <small>TE · CLE</small></div>
+            <span class="pproj">41.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>41.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Harold Fannin Jr.</b> <small>TE · CLE</small></div>
+            <span class="pproj">3.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>KC Concepcion</b> <small>WR · CLE</small></div>
+            <span class="pproj">3.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Denzel Boston</b> <small>WR · CLE</small></div>
+            <span class="pproj">3.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Quinshon Judkins</b> <small>RB · CLE</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Audric Estimé</b> <small>RB · CLE</small></div>
+            <span class="pproj">24%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>24%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Deshaun Watson</b> <small>QB · CLE</small></div>
+            <span class="pproj">23%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>23%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Cam Ward</b> <small>QB · TEN</small></div>
+            <span class="pproj">204.3</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>204.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Tony Pollard</b> <small>RB · TEN</small></div>
+            <span class="pproj">83.9</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>83.9</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Nicholas Singleton</b> <small>RB · TEN</small></div>
+            <span class="pproj">19.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>19.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Carnell Tate</b> <small>WR · TEN</small></div>
+            <span class="pproj">51.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>51.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Wan&#x27;Dale Robinson</b> <small>WR · TEN</small></div>
+            <span class="pproj">38.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>38.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.6</b></span><span>ZONE <b>6.8</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Gunnar Helm</b> <small>TE · TEN</small></div>
+            <span class="pproj">23.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>23.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Wan&#x27;Dale Robinson</b> <small>WR · TEN</small></div>
+            <span class="pproj">4.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.6</b></span><span>ZONE <b>6.8</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Carnell Tate</b> <small>WR · TEN</small></div>
+            <span class="pproj">4.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Gunnar Helm</b> <small>TE · TEN</small></div>
+            <span class="pproj">2.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tony Pollard</b> <small>RB · TEN</small></div>
+            <span class="pproj">42%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>42%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Carnell Tate</b> <small>WR · TEN</small></div>
+            <span class="pproj">27%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>27%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Wan&#x27;Dale Robinson</b> <small>WR · TEN</small></div>
+            <span class="pproj">24%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>24%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-play" data-day="SUN" data-play="1" data-rank="2">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>U.S. Bank Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#002C5F;color:#fff">IND</span>
+        <div class="tname"><b>Colts</b><small>2-4 · Daniel Jones</small></div>
+        <div class="proj">18.3</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#4F2683;color:#FFC62F">MIN</span>
+        <div class="tname"><b>Vikings</b><small>5-0 · Kyler Murray</small></div>
+        <div class="proj">27.5</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>IND 25%</span><span class="cap">WIN PROB</span><span>MIN 75%</span></div>
+        <div class="wpbar"><i style="width:24.9%;background:#002C5F"></i><i style="width:75.1%;background:#4F2683"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>MIN -5.5</span></div>
+          <div><small>MODEL</small><span>MIN -9.2</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.7</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>MIN -5.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>41.5</span></div>
+          <div><small>MODEL</small><span>45.8</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.3</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>OVER 41.5</div>
+      </div>
+      <div class="ml">ML VALUE <b>MIN -239</b><span>+5.0% vs no-vig</span></div>
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">IND PASS O <em>vs</em> MIN D</span>
+            <span class="sbar"><i class="neg" style="width:46.2%"></i></span>
+            <span class="sval neg">-0.28</span></div>
+          <div class="srow"><span class="slab">IND RUSH O <em>vs</em> MIN D</span>
+            <span class="sbar"><i class="neg" style="width:0.8%"></i></span>
+            <span class="sval neg">-0.01</span></div>
+          <div class="srow"><span class="slab">MIN PASS O <em>vs</em> IND D</span>
+            <span class="sbar"><i class="neg" style="width:6.8%"></i></span>
+            <span class="sval neg">-0.04</span></div>
+          <div class="srow"><span class="slab">MIN RUSH O <em>vs</em> IND D</span>
+            <span class="sbar"><i class="pos" style="width:4.1%"></i></span>
+            <span class="sval pos">+0.02</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>IND D</b><span>MAN 36% · C3 · PRESS 29% · BLITZ 21%</span></div><div class="dline"><b>MIN D</b><span>MAN 18% · C2 · PRESS 33% · BLITZ 70%</span></div></div>
+      <div class="chips"><span class="chip">MIN OFF BYE</span><span class="chip">DOME</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Daniel Jones</b> <small>QB · IND</small></div>
+            <span class="pproj">201.1</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>201.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jonathan Taylor</b> <small>RB · IND</small></div>
+            <span class="pproj">48.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>48.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Seth McGowan</b> <small>RB · IND</small></div>
+            <span class="pproj">13.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>13.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tyler Warren</b> <small>TE · IND</small></div>
+            <span class="pproj">47.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>47.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.7</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Keenan Allen</b> <small>WR · IND</small></div>
+            <span class="pproj">44.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>44.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.0</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV +5%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Josh Downs</b> <small>WR · IND</small></div>
+            <span class="pproj">43.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>43.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>6.6</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tyler Warren</b> <small>TE · IND</small></div>
+            <span class="pproj">5.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.7</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Keenan Allen</b> <small>WR · IND</small></div>
+            <span class="pproj">4.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.0</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV +5%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Josh Downs</b> <small>WR · IND</small></div>
+            <span class="pproj">3.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>6.6</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jonathan Taylor</b> <small>RB · IND</small></div>
+            <span class="pproj">46%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>46%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tyler Warren</b> <small>TE · IND</small></div>
+            <span class="pproj">23%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>23%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Keenan Allen</b> <small>WR · IND</small></div>
+            <span class="pproj">22%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>22%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Kyler Murray</b> <small>QB · MIN</small></div>
+            <span class="pproj">243.1</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>243.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Aaron Jones</b> <small>RB · MIN</small></div>
+            <span class="pproj">72.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>72.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jordan Mason</b> <small>RB · MIN</small></div>
+            <span class="pproj">60.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>60.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Justin Jefferson</b> <small>WR · MIN</small></div>
+            <span class="pproj">63.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>63.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.6</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jordan Addison</b> <small>WR · MIN</small></div>
+            <span class="pproj">51.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>51.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>8.9</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>T.J. Hockenson</b> <small>TE · MIN</small></div>
+            <span class="pproj">40.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>40.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Justin Jefferson</b> <small>WR · MIN</small></div>
+            <span class="pproj">4.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.6</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>T.J. Hockenson</b> <small>TE · MIN</small></div>
+            <span class="pproj">4.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Jordan Addison</b> <small>WR · MIN</small></div>
+            <span class="pproj">3.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>8.9</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Aaron Jones</b> <small>RB · MIN</small></div>
+            <span class="pproj">48%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>48%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jordan Mason</b> <small>RB · MIN</small></div>
+            <span class="pproj">43%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>43%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Justin Jefferson</b> <small>WR · MIN</small></div>
+            <span class="pproj">33%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>33%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-play" data-day="SUN" data-play="1" data-rank="2">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>MetLife Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#008E97;color:#fff">MIA</span>
+        <div class="tname"><b>Dolphins</b><small>0-5 · Malik Willis</small></div>
+        <div class="proj">17.2</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#125740;color:#fff">NYJ</span>
+        <div class="tname"><b>Jets</b><small>2-4 · Geno Smith</small></div>
+        <div class="proj">25.6</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>MIA 27%</span><span class="cap">WIN PROB</span><span>NYJ 73%</span></div>
+        <div class="wpbar"><i style="width:26.9%;background:#008E97"></i><i style="width:73.1%;background:#125740"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>NYJ -5.5</span></div>
+          <div><small>MODEL</small><span>NYJ -8.3</span></div>
+          <div class="edge "><small>EDGE</small><span>2.8</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>38.5</span></div>
+          <div><small>MODEL</small><span>42.8</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.3</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>OVER 38.5</div>
+      </div>
+      <div class="ml">ML VALUE <b>NYJ -217</b><span>+5.0% vs no-vig</span></div>
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">MIA PASS O <em>vs</em> NYJ D</span>
+            <span class="sbar"><i class="neg" style="width:23.9%"></i></span>
+            <span class="sval neg">-0.14</span></div>
+          <div class="srow"><span class="slab">MIA RUSH O <em>vs</em> NYJ D</span>
+            <span class="sbar"><i class="neg" style="width:6.3%"></i></span>
+            <span class="sval neg">-0.04</span></div>
+          <div class="srow"><span class="slab">NYJ PASS O <em>vs</em> MIA D</span>
+            <span class="sbar"><i class="pos" style="width:30.7%"></i></span>
+            <span class="sval pos">+0.18</span></div>
+          <div class="srow"><span class="slab">NYJ RUSH O <em>vs</em> MIA D</span>
+            <span class="sbar"><i class="neg" style="width:16.9%"></i></span>
+            <span class="sval neg">-0.10</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>MIA D</b><span>MAN 27% · C2 · PRESS 27% · BLITZ 27%</span></div><div class="dline"><b>NYJ D</b><span>MAN 40% · C1 · PRESS 24% · BLITZ 37%</span></div></div>
+      <div class="chips"><span class="chip">MIA OFF BYE</span><span class="chip">64°F · 8 MPH</span><span class="chip">DIVISION</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Malik Willis</b> <small>QB · MIA</small></div>
+            <span class="pproj">204.5</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>204.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Ollie Gordon II</b> <small>RB · MIA</small></div>
+            <span class="pproj">67.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>67.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Malik Willis</b> <small>QB · MIA</small></div>
+            <span class="pproj">27.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>27.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Malik Washington</b> <small>WR · MIA</small></div>
+            <span class="pproj">53.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>53.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.2</b></span><span>ZONE <b>6.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Caleb Douglas</b> <small>WR · MIA</small></div>
+            <span class="pproj">40.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>40.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Greg Dulcich</b> <small>TE · MIA</small></div>
+            <span class="pproj">31.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>31.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>7.6</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Malik Washington</b> <small>WR · MIA</small></div>
+            <span class="pproj">4.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.2</b></span><span>ZONE <b>6.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Greg Dulcich</b> <small>TE · MIA</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>7.6</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Caleb Douglas</b> <small>WR · MIA</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Ollie Gordon II</b> <small>RB · MIA</small></div>
+            <span class="pproj">44%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>44%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Malik Washington</b> <small>WR · MIA</small></div>
+            <span class="pproj">27%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>27%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Caleb Douglas</b> <small>WR · MIA</small></div>
+            <span class="pproj">22%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>22%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Geno Smith</b> <small>QB · NYJ</small></div>
+            <span class="pproj">208.8</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>208.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Braelon Allen</b> <small>RB · NYJ</small></div>
+            <span class="pproj">69.4</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>69.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Breece Hall</b> <small>RB · NYJ</small></div>
+            <span class="pproj">64.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>64.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Garrett Wilson</b> <small>WR · NYJ</small></div>
+            <span class="pproj">66.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>66.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.2</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Adonai Mitchell</b> <small>WR · NYJ</small></div>
+            <span class="pproj">63.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>63.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.6</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Omar Cooper Jr.</b> <small>WR · NYJ</small></div>
+            <span class="pproj">41.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>41.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Garrett Wilson</b> <small>WR · NYJ</small></div>
+            <span class="pproj">5.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.2</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Adonai Mitchell</b> <small>WR · NYJ</small></div>
+            <span class="pproj">4.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.6</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Omar Cooper Jr.</b> <small>WR · NYJ</small></div>
+            <span class="pproj">3.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Breece Hall</b> <small>RB · NYJ</small></div>
+            <span class="pproj">45%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>45%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Braelon Allen</b> <small>RB · NYJ</small></div>
+            <span class="pproj">42%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>42%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Garrett Wilson</b> <small>WR · NYJ</small></div>
+            <span class="pproj">40%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>40%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-play" data-day="SUN" data-play="1" data-rank="2">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>Reliant Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#0B2265;color:#fff">NYG</span>
+        <div class="tname"><b>Giants</b><small>3-2-1 · Jameis Winston</small></div>
+        <div class="proj">21.8</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#03202F;color:#fff">HOU</span>
+        <div class="tname"><b>Texans</b><small>2-4 · C.J. Stroud</small></div>
+        <div class="proj">24.9</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>NYG 41%</span><span class="cap">WIN PROB</span><span>HOU 59%</span></div>
+        <div class="wpbar"><i style="width:40.9%;background:#0B2265"></i><i style="width:59.1%;background:#03202F"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>HOU -7.5</span></div>
+          <div><small>MODEL</small><span>HOU -3.1</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.4</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>NYG +7.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>42.5</span></div>
+          <div><small>MODEL</small><span>46.6</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.1</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>OVER 42.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">NYG PASS O <em>vs</em> HOU D</span>
+            <span class="sbar"><i class="pos" style="width:4.0%"></i></span>
+            <span class="sval pos">+0.02</span></div>
+          <div class="srow"><span class="slab">NYG RUSH O <em>vs</em> HOU D</span>
+            <span class="sbar"><i class="neg" style="width:13.4%"></i></span>
+            <span class="sval neg">-0.08</span></div>
+          <div class="srow"><span class="slab">HOU PASS O <em>vs</em> NYG D</span>
+            <span class="sbar"><i class="pos" style="width:9.8%"></i></span>
+            <span class="sval pos">+0.06</span></div>
+          <div class="srow"><span class="slab">HOU RUSH O <em>vs</em> NYG D</span>
+            <span class="sbar"><i class="pos" style="width:1.8%"></i></span>
+            <span class="sval pos">+0.01</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>NYG D</b><span>MAN 40% · C1 · PRESS 30% · BLITZ 42%</span></div><div class="dline"><b>HOU D</b><span>MAN 31% · C1 · PRESS 30% · BLITZ 23%</span></div></div>
+      <div class="chips"><span class="chip">DOME</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Jameis Winston</b> <small>QB · NYG</small></div>
+            <span class="pproj">174.9</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>174.9</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Cam Skattebo</b> <small>RB · NYG</small></div>
+            <span class="pproj">53.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>53.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Najee Harris</b> <small>RB · NYG</small></div>
+            <span class="pproj">19.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>19.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Malik Nabers</b> <small>WR · NYG</small></div>
+            <span class="pproj">70.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>70.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Isaiah Likely</b> <small>TE · NYG</small></div>
+            <span class="pproj">63.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>63.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Malachi Fields</b> <small>WR · NYG</small></div>
+            <span class="pproj">32.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>32.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Malik Nabers</b> <small>WR · NYG</small></div>
+            <span class="pproj">6.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Isaiah Likely</b> <small>TE · NYG</small></div>
+            <span class="pproj">6.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Malachi Fields</b> <small>WR · NYG</small></div>
+            <span class="pproj">2.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Cam Skattebo</b> <small>RB · NYG</small></div>
+            <span class="pproj">36%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>36%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Malik Nabers</b> <small>WR · NYG</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Isaiah Likely</b> <small>TE · NYG</small></div>
+            <span class="pproj">28%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>28%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>C.J. Stroud</b> <small>QB · HOU</small></div>
+            <span class="pproj">215.8</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>215.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Woody Marks</b> <small>RB · HOU</small></div>
+            <span class="pproj">56.7</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>56.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jawhar Jordan</b> <small>RB · HOU</small></div>
+            <span class="pproj">38.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>38.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Nico Collins</b> <small>WR · HOU</small></div>
+            <span class="pproj">65.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>65.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Xavier Hutchinson</b> <small>WR · HOU</small></div>
+            <span class="pproj">38.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>38.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.8</b></span><span>ZONE <b>6.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Dalton Schultz</b> <small>TE · HOU</small></div>
+            <span class="pproj">34.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>34.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.3</b></span><span>ZONE <b>7.6</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Nico Collins</b> <small>WR · HOU</small></div>
+            <span class="pproj">4.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Dalton Schultz</b> <small>TE · HOU</small></div>
+            <span class="pproj">3.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.3</b></span><span>ZONE <b>7.6</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Xavier Hutchinson</b> <small>WR · HOU</small></div>
+            <span class="pproj">2.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.8</b></span><span>ZONE <b>6.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Woody Marks</b> <small>RB · HOU</small></div>
+            <span class="pproj">44%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>44%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Nico Collins</b> <small>WR · HOU</small></div>
+            <span class="pproj">35%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>35%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>David Montgomery</b> <small>RB · HOU</small></div>
+            <span class="pproj">30%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>30%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>Mercedes-Benz Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#AA0000;color:#fff">SF</span>
+        <div class="tname"><b>49ers</b><small>6-0 · Brock Purdy</small></div>
+        <div class="proj">27.3</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#A71930;color:#fff">ATL</span>
+        <div class="tname"><b>Falcons</b><small>2-4 · Michael Penix Jr.</small></div>
+        <div class="proj">20.1</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>SF 71%</span><span class="cap">WIN PROB</span><span>ATL 29%</span></div>
+        <div class="wpbar"><i style="width:70.5%;background:#AA0000"></i><i style="width:29.5%;background:#A71930"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>SF -3.5</span></div>
+          <div><small>MODEL</small><span>SF -7.3</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.8</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>SF -3.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>49.5</span></div>
+          <div><small>MODEL</small><span>47.4</span></div>
+          <div class="edge "><small>EDGE</small><span>2.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">SF PASS O <em>vs</em> ATL D</span>
+            <span class="sbar"><i class="pos" style="width:30.8%"></i></span>
+            <span class="sval pos">+0.18</span></div>
+          <div class="srow"><span class="slab">SF RUSH O <em>vs</em> ATL D</span>
+            <span class="sbar"><i class="pos" style="width:5.1%"></i></span>
+            <span class="sval pos">+0.03</span></div>
+          <div class="srow"><span class="slab">ATL PASS O <em>vs</em> SF D</span>
+            <span class="sbar"><i class="neg" style="width:18.5%"></i></span>
+            <span class="sval neg">-0.11</span></div>
+          <div class="srow"><span class="slab">ATL RUSH O <em>vs</em> SF D</span>
+            <span class="sbar"><i class="neg" style="width:5.0%"></i></span>
+            <span class="sval neg">-0.03</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>SF D</b><span>MAN 25% · C3 · PRESS 23% · BLITZ 25%</span></div><div class="dline"><b>ATL D</b><span>MAN 33% · C1 · PRESS 31% · BLITZ 26%</span></div></div>
+      <div class="chips"><span class="chip">DOME</span><span class="chip">SF CROSS-COUNTRY</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Brock Purdy</b> <small>QB · SF</small></div>
+            <span class="pproj">267.6</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>267.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Christian McCaffrey</b> <small>RB · SF</small></div>
+            <span class="pproj">55.7</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>55.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Kaelon Black</b> <small>RB · SF</small></div>
+            <span class="pproj">33.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>33.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Mike Evans</b> <small>WR · SF</small></div>
+            <span class="pproj">63.1</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>63.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>George Kittle</b> <small>TE · SF</small></div>
+            <span class="pproj">53.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>53.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.8</b></span><span>ZONE <b>10.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Demarcus Robinson</b> <small>WR · SF</small></div>
+            <span class="pproj">35.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>35.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.6</b></span><span>ZONE <b>8.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>George Kittle</b> <small>TE · SF</small></div>
+            <span class="pproj">4.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.8</b></span><span>ZONE <b>10.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Christian McCaffrey</b> <small>RB · SF</small></div>
+            <span class="pproj">4.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Mike Evans</b> <small>WR · SF</small></div>
+            <span class="pproj">4.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Christian McCaffrey</b> <small>RB · SF</small></div>
+            <span class="pproj">62%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>62%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>George Kittle</b> <small>TE · SF</small></div>
+            <span class="pproj">44%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>44%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Mike Evans</b> <small>WR · SF</small></div>
+            <span class="pproj">28%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>28%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Michael Penix Jr.</b> <small>QB · ATL</small></div>
+            <span class="pproj">270.0</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>270.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Bijan Robinson</b> <small>RB · ATL</small></div>
+            <span class="pproj">71.7</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>71.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Brian Robinson</b> <small>RB · ATL</small></div>
+            <span class="pproj">23.9</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>23.9</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Drake London</b> <small>WR · ATL</small></div>
+            <span class="pproj">72.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>72.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.8</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jahan Dotson</b> <small>WR · ATL</small></div>
+            <span class="pproj">38.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>38.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.9</b></span><span>ZONE <b>7.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Kyle Pitts</b> <small>TE · ATL</small></div>
+            <span class="pproj">34.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>34.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.4</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Drake London</b> <small>WR · ATL</small></div>
+            <span class="pproj">5.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>8.8</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Kyle Pitts</b> <small>TE · ATL</small></div>
+            <span class="pproj">3.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.4</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Bijan Robinson</b> <small>RB · ATL</small></div>
+            <span class="pproj">3.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.2</b></span><span>ZONE <b>6.8</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Bijan Robinson</b> <small>RB · ATL</small></div>
+            <span class="pproj">45%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>45%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Drake London</b> <small>WR · ATL</small></div>
+            <span class="pproj">37%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>37%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jahan Dotson</b> <small>WR · ATL</small></div>
+            <span class="pproj">30%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>30%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-play" data-day="SUN" data-play="1" data-rank="2">
+      <header class="meta"><span>SUN · 1:00 PM ET</span><span>Bank of America Stadium</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#D50A0A;color:#fff">TB</span>
+        <div class="tname"><b>Buccaneers</b><small>1-5 · Jalon Daniels</small></div>
+        <div class="proj">18.3</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0085CA;color:#fff">CAR</span>
+        <div class="tname"><b>Panthers</b><small>3-2 · Bryce Young</small></div>
+        <div class="proj">27.6</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>TB 25%</span><span class="cap">WIN PROB</span><span>CAR 75%</span></div>
+        <div class="wpbar"><i style="width:24.7%;background:#D50A0A"></i><i style="width:75.3%;background:#0085CA"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>CAR -3.5</span></div>
+          <div><small>MODEL</small><span>CAR -9.2</span></div>
+          <div class="edge hot"><small>EDGE</small><span>5.7</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>CAR -3.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>44.5</span></div>
+          <div><small>MODEL</small><span>45.9</span></div>
+          <div class="edge "><small>EDGE</small><span>1.4</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">TB PASS O <em>vs</em> CAR D</span>
+            <span class="sbar"><i class="neg" style="width:34.9%"></i></span>
+            <span class="sval neg">-0.21</span></div>
+          <div class="srow"><span class="slab">TB RUSH O <em>vs</em> CAR D</span>
+            <span class="sbar"><i class="pos" style="width:12.1%"></i></span>
+            <span class="sval pos">+0.07</span></div>
+          <div class="srow"><span class="slab">CAR PASS O <em>vs</em> TB D</span>
+            <span class="sbar"><i class="pos" style="width:8.2%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">CAR RUSH O <em>vs</em> TB D</span>
+            <span class="sbar"><i class="neg" style="width:5.9%"></i></span>
+            <span class="sval neg">-0.04</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>TB D</b><span>MAN 29% · C3 · PRESS 34% · BLITZ 42%</span></div><div class="dline"><b>CAR D</b><span>MAN 21% · C3 · PRESS 21% · BLITZ 37%</span></div></div>
+      <div class="chips"><span class="chip">67°F · 6 MPH</span><span class="chip">DIVISION</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Jalon Daniels</b> <small>QB · TB</small></div>
+            <span class="pproj">207.4</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>207.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Bucky Irving</b> <small>RB · TB</small></div>
+            <span class="pproj">62.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>62.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jalon Daniels</b> <small>QB · TB</small></div>
+            <span class="pproj">24.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>24.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Emeka Egbuka</b> <small>WR · TB</small></div>
+            <span class="pproj">63.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>63.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.6</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Cade Otton</b> <small>TE · TB</small></div>
+            <span class="pproj">45.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>45.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.1</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Chris Godwin Jr.</b> <small>WR · TB</small></div>
+            <span class="pproj">40.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>40.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.1</b></span><span>ZONE <b>8.8</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Emeka Egbuka</b> <small>WR · TB</small></div>
+            <span class="pproj">5.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.6</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Cade Otton</b> <small>TE · TB</small></div>
+            <span class="pproj">4.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.1</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Chris Godwin Jr.</b> <small>WR · TB</small></div>
+            <span class="pproj">3.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.1</b></span><span>ZONE <b>8.8</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Bucky Irving</b> <small>RB · TB</small></div>
+            <span class="pproj">42%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>42%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Emeka Egbuka</b> <small>WR · TB</small></div>
+            <span class="pproj">25%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>25%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Cade Otton</b> <small>TE · TB</small></div>
+            <span class="pproj">21%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>21%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Bryce Young</b> <small>QB · CAR</small></div>
+            <span class="pproj">268.1</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>268.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Chuba Hubbard</b> <small>RB · CAR</small></div>
+            <span class="pproj">72.7</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>72.7</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jonathon Brooks</b> <small>RB · CAR</small></div>
+            <span class="pproj">15.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>15.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tetairoa McMillan</b> <small>WR · CAR</small></div>
+            <span class="pproj">70.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>70.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.3</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jalen Coker</b> <small>WR · CAR</small></div>
+            <span class="pproj">64.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>64.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.9</b></span><span>ZONE <b>8.2</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Darren Waller</b> <small>TE · CAR</small></div>
+            <span class="pproj">28.3</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>28.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.1</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tetairoa McMillan</b> <small>WR · CAR</small></div>
+            <span class="pproj">5.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.3</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Jalen Coker</b> <small>WR · CAR</small></div>
+            <span class="pproj">5.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.9</b></span><span>ZONE <b>8.2</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tommy Tremble</b> <small>TE · CAR</small></div>
+            <span class="pproj">2.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.5</b></span><span>ZONE <b>8.4</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Chuba Hubbard</b> <small>RB · CAR</small></div>
+            <span class="pproj">58%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>58%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tetairoa McMillan</b> <small>WR · CAR</small></div>
+            <span class="pproj">41%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>41%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jalen Coker</b> <small>WR · CAR</small></div>
+            <span class="pproj">34%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>34%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · 4:05 PM ET</span><span>State Farm Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#FB4F14;color:#000">DEN</span>
+        <div class="tname"><b>Broncos</b><small>4-2 · Bo Nix</small></div>
+        <div class="proj">22.3</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#97233F;color:#fff">ARI</span>
+        <div class="tname"><b>Cardinals</b><small>2-4 · Jacoby Brissett</small></div>
+        <div class="proj">21.1</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>DEN 53%</span><span class="cap">WIN PROB</span><span>ARI 47%</span></div>
+        <div class="wpbar"><i style="width:53.4%;background:#FB4F14"></i><i style="width:46.6%;background:#97233F"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>DEN -5.5</span></div>
+          <div><small>MODEL</small><span>DEN -1.1</span></div>
+          <div class="edge hot"><small>EDGE</small><span>4.4</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>ARI +5.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>44.5</span></div>
+          <div><small>MODEL</small><span>43.4</span></div>
+          <div class="edge "><small>EDGE</small><span>1.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">DEN PASS O <em>vs</em> ARI D</span>
+            <span class="sbar"><i class="pos" style="width:13.5%"></i></span>
+            <span class="sval pos">+0.08</span></div>
+          <div class="srow"><span class="slab">DEN RUSH O <em>vs</em> ARI D</span>
+            <span class="sbar"><i class="neg" style="width:13.9%"></i></span>
+            <span class="sval neg">-0.08</span></div>
+          <div class="srow"><span class="slab">ARI PASS O <em>vs</em> DEN D</span>
+            <span class="sbar"><i class="neg" style="width:15.4%"></i></span>
+            <span class="sval neg">-0.09</span></div>
+          <div class="srow"><span class="slab">ARI RUSH O <em>vs</em> DEN D</span>
+            <span class="sbar"><i class="pos" style="width:6.0%"></i></span>
+            <span class="sval pos">+0.04</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>DEN D</b><span>MAN 44% · C1 · PRESS 34% · BLITZ 37%</span></div><div class="dline"><b>ARI D</b><span>MAN 28% · C3 · PRESS 26% · BLITZ 28%</span></div></div>
+      <div class="chips"><span class="chip">DOME</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Bo Nix</b> <small>QB · DEN</small></div>
+            <span class="pproj">207.9</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>207.9</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>J.K. Dobbins</b> <small>RB · DEN</small></div>
+            <span class="pproj">51.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>51.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jonah Coleman</b> <small>RB · DEN</small></div>
+            <span class="pproj">32.8</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>32.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jaylen Waddle</b> <small>WR · DEN</small></div>
+            <span class="pproj">46.1</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>46.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.4</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Courtland Sutton</b> <small>WR · DEN</small></div>
+            <span class="pproj">39.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>39.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Pat Bryant</b> <small>WR · DEN</small></div>
+            <span class="pproj">26.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>26.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>7.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>RJ Harvey</b> <small>RB · DEN</small></div>
+            <span class="pproj">3.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.5</b></span><span>ZONE <b>6.6</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Jaylen Waddle</b> <small>WR · DEN</small></div>
+            <span class="pproj">3.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.4</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Courtland Sutton</b> <small>WR · DEN</small></div>
+            <span class="pproj">2.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>2.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.0</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>J.K. Dobbins</b> <small>RB · DEN</small></div>
+            <span class="pproj">40%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>40%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jaylen Waddle</b> <small>WR · DEN</small></div>
+            <span class="pproj">27%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>27%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Courtland Sutton</b> <small>WR · DEN</small></div>
+            <span class="pproj">26%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>26%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Jacoby Brissett</b> <small>QB · ARI</small></div>
+            <span class="pproj">263.9</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>263.9</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jeremiyah Love</b> <small>RB · ARI</small></div>
+            <span class="pproj">49.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>49.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Tyler Allgeier</b> <small>RB · ARI</small></div>
+            <span class="pproj">42.4</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>42.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Trey McBride</b> <small>TE · ARI</small></div>
+            <span class="pproj">64.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>64.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.4</b></span><span>ZONE <b>8.2</b></span><span class="cov ">COV -3%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Michael Wilson</b> <small>WR · ARI</small></div>
+            <span class="pproj">59.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>59.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.8</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Kendrick Bourne</b> <small>WR · ARI</small></div>
+            <span class="pproj">34.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>34.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>9.7</b></span><span class="cov ">COV -4%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Trey McBride</b> <small>TE · ARI</small></div>
+            <span class="pproj">5.9</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.4</b></span><span>ZONE <b>8.2</b></span><span class="cov ">COV -3%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Michael Wilson</b> <small>WR · ARI</small></div>
+            <span class="pproj">5.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.8</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Kendrick Bourne</b> <small>WR · ARI</small></div>
+            <span class="pproj">3.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.0</b></span><span>ZONE <b>9.7</b></span><span class="cov ">COV -4%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jeremiyah Love</b> <small>RB · ARI</small></div>
+            <span class="pproj">34%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>34%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Trey McBride</b> <small>TE · ARI</small></div>
+            <span class="pproj">33%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>33%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Michael Wilson</b> <small>WR · ARI</small></div>
+            <span class="pproj">26%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>26%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-lean" data-day="SUN" data-play="1" data-rank="1">
+      <header class="meta"><span>SUN · 4:25 PM ET</span><span>Ford Field</span></header>
+      
+      <div class="team ">
+        <span class="badge" style="background:#203731;color:#FFB612">GB</span>
+        <div class="tname"><b>Packers</b><small>4-2 · Jordan Love</small></div>
+        <div class="proj">23.4</div>
+      </div>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#0076B6;color:#fff">DET</span>
+        <div class="tname"><b>Lions</b><small>3-2 · Jared Goff</small></div>
+        <div class="proj">27.3</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>GB 39%</span><span class="cap">WIN PROB</span><span>DET 61%</span></div>
+        <div class="wpbar"><i style="width:38.8%;background:#203731"></i><i style="width:61.2%;background:#0076B6"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>DET -3.5</span></div>
+          <div><small>MODEL</small><span>DET -3.8</span></div>
+          <div class="edge "><small>EDGE</small><span>0.3</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>53.5</span></div>
+          <div><small>MODEL</small><span>50.7</span></div>
+          <div class="edge hot"><small>EDGE</small><span>2.8</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>UNDER 53.5</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">GB PASS O <em>vs</em> DET D</span>
+            <span class="sbar"><i class="pos" style="width:32.6%"></i></span>
+            <span class="sval pos">+0.20</span></div>
+          <div class="srow"><span class="slab">GB RUSH O <em>vs</em> DET D</span>
+            <span class="sbar"><i class="neg" style="width:15.9%"></i></span>
+            <span class="sval neg">-0.10</span></div>
+          <div class="srow"><span class="slab">DET PASS O <em>vs</em> GB D</span>
+            <span class="sbar"><i class="pos" style="width:17.0%"></i></span>
+            <span class="sval pos">+0.10</span></div>
+          <div class="srow"><span class="slab">DET RUSH O <em>vs</em> GB D</span>
+            <span class="sbar"><i class="pos" style="width:6.0%"></i></span>
+            <span class="sval pos">+0.04</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>GB D</b><span>MAN 20% · C3 · PRESS 30% · BLITZ 34%</span></div><div class="dline"><b>DET D</b><span>MAN 41% · C1 · PRESS 30% · BLITZ 30%</span></div></div>
+      <div class="chips"><span class="chip">DET OFF BYE</span><span class="chip">DOME</span><span class="chip">DIVISION</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Jordan Love</b> <small>QB · GB</small></div>
+            <span class="pproj">240.0</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>240.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Pierre Strong</b> <small>RB · GB</small></div>
+            <span class="pproj">42.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>42.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>MarShawn Lloyd</b> <small>RB · GB</small></div>
+            <span class="pproj">36.5</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>36.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Matthew Golden</b> <small>WR · GB</small></div>
+            <span class="pproj">83.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>83.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.4</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Christian Watson</b> <small>WR · GB</small></div>
+            <span class="pproj">74.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>74.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.5</b></span><span>ZONE <b>10.2</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tucker Kraft</b> <small>TE · GB</small></div>
+            <span class="pproj">45.1</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>45.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>10.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Christian Watson</b> <small>WR · GB</small></div>
+            <span class="pproj">5.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.5</b></span><span>ZONE <b>10.2</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Matthew Golden</b> <small>WR · GB</small></div>
+            <span class="pproj">5.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.4</b></span><span>ZONE <b>8.1</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tucker Kraft</b> <small>TE · GB</small></div>
+            <span class="pproj">4.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>10.3</b></span><span>ZONE <b>8.3</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Christian Watson</b> <small>WR · GB</small></div>
+            <span class="pproj">36%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>36%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Matthew Golden</b> <small>WR · GB</small></div>
+            <span class="pproj">36%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>36%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Pierre Strong</b> <small>RB · GB</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Jared Goff</b> <small>QB · DET</small></div>
+            <span class="pproj">294.8</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>294.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Jahmyr Gibbs</b> <small>RB · DET</small></div>
+            <span class="pproj">92.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>92.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Sione Vaki</b> <small>RB · DET</small></div>
+            <span class="pproj">18.5</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>18.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Amon-Ra St. Brown</b> <small>WR · DET</small></div>
+            <span class="pproj">82.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>82.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Sam LaPorta</b> <small>TE · DET</small></div>
+            <span class="pproj">62.6</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>62.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jameson Williams</b> <small>WR · DET</small></div>
+            <span class="pproj">54.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>54.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>11.1</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Amon-Ra St. Brown</b> <small>WR · DET</small></div>
+            <span class="pproj">7.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>7.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Sam LaPorta</b> <small>TE · DET</small></div>
+            <span class="pproj">5.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>9.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Jahmyr Gibbs</b> <small>RB · DET</small></div>
+            <span class="pproj">4.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.1</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jahmyr Gibbs</b> <small>RB · DET</small></div>
+            <span class="pproj">63%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>63%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Amon-Ra St. Brown</b> <small>WR · DET</small></div>
+            <span class="pproj">51%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>51%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jameson Williams</b> <small>WR · DET</small></div>
+            <span class="pproj">39%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>39%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-none" data-day="SUN" data-play="0" data-rank="0">
+      <header class="meta"><span>SUN · 4:25 PM ET</span><span>Allegiant Stadium</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#003594;color:#FFD100">LA</span>
+        <div class="tname"><b>Rams</b><small>2-4 · Matthew Stafford</small></div>
+        <div class="proj">25.1</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#000000;color:#A5ACAF">LV</span>
+        <div class="tname"><b>Raiders</b><small>3-3 · Kirk Cousins</small></div>
+        <div class="proj">23.7</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>LA 54%</span><span class="cap">WIN PROB</span><span>LV 46%</span></div>
+        <div class="wpbar"><i style="width:54.1%;background:#003594"></i><i style="width:45.9%;background:#000000"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>LA -3.5</span></div>
+          <div><small>MODEL</small><span>LA -1.4</span></div>
+          <div class="edge "><small>EDGE</small><span>2.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>47.5</span></div>
+          <div><small>MODEL</small><span>48.8</span></div>
+          <div class="edge "><small>EDGE</small><span>1.3</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">LA PASS O <em>vs</em> LV D</span>
+            <span class="sbar"><i class="pos" style="width:16.6%"></i></span>
+            <span class="sval pos">+0.10</span></div>
+          <div class="srow"><span class="slab">LA RUSH O <em>vs</em> LV D</span>
+            <span class="sbar"><i class="neg" style="width:3.4%"></i></span>
+            <span class="sval neg">-0.02</span></div>
+          <div class="srow"><span class="slab">LV PASS O <em>vs</em> LA D</span>
+            <span class="sbar"><i class="pos" style="width:9.1%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">LV RUSH O <em>vs</em> LA D</span>
+            <span class="sbar"><i class="neg" style="width:17.9%"></i></span>
+            <span class="sval neg">-0.11</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>LA D</b><span>MAN 26% · C3 · PRESS 32% · BLITZ 31%</span></div><div class="dline"><b>LV D</b><span>MAN 20% · C3 · PRESS 27% · BLITZ 27%</span></div></div>
+      <div class="chips"><span class="chip">DOME</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Matthew Stafford</b> <small>QB · LA</small></div>
+            <span class="pproj">292.3</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>292.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Kyren Williams</b> <small>RB · LA</small></div>
+            <span class="pproj">67.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>67.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Blake Corum</b> <small>RB · LA</small></div>
+            <span class="pproj">30.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>30.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Puka Nacua</b> <small>WR · LA</small></div>
+            <span class="pproj">81.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>81.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.6</b></span><span>ZONE <b>9.5</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Davante Adams</b> <small>WR · LA</small></div>
+            <span class="pproj">61.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>61.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.6</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tyler Higbee</b> <small>TE · LA</small></div>
+            <span class="pproj">41.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>41.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.8</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV +4%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Puka Nacua</b> <small>WR · LA</small></div>
+            <span class="pproj">6.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.6</b></span><span>ZONE <b>9.5</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Davante Adams</b> <small>WR · LA</small></div>
+            <span class="pproj">4.4</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.6</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Tyler Higbee</b> <small>TE · LA</small></div>
+            <span class="pproj">4.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.8</b></span><span>ZONE <b>9.0</b></span><span class="cov ">COV +4%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Kyren Williams</b> <small>RB · LA</small></div>
+            <span class="pproj">59%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>59%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Puka Nacua</b> <small>WR · LA</small></div>
+            <span class="pproj">50%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>50%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Davante Adams</b> <small>WR · LA</small></div>
+            <span class="pproj">38%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>38%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Kirk Cousins</b> <small>QB · LV</small></div>
+            <span class="pproj">274.4</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>274.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Ashton Jeanty</b> <small>RB · LV</small></div>
+            <span class="pproj">53.2</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>53.2</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Mike Washington Jr.</b> <small>RB · LV</small></div>
+            <span class="pproj">26.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>26.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Brock Bowers</b> <small>TE · LV</small></div>
+            <span class="pproj">75.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>75.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Tre Tucker</b> <small>WR · LV</small></div>
+            <span class="pproj">49.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>49.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.5</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Michael Mayer</b> <small>TE · LV</small></div>
+            <span class="pproj">37.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>37.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.7</b></span><span>ZONE <b>6.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Brock Bowers</b> <small>TE · LV</small></div>
+            <span class="pproj">6.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.9</b></span><span>ZONE <b>7.5</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Michael Mayer</b> <small>TE · LV</small></div>
+            <span class="pproj">4.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.7</b></span><span>ZONE <b>6.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Ashton Jeanty</b> <small>RB · LV</small></div>
+            <span class="pproj">4.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.9</b></span><span>ZONE <b>5.2</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Ashton Jeanty</b> <small>RB · LV</small></div>
+            <span class="pproj">46%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>46%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Brock Bowers</b> <small>TE · LV</small></div>
+            <span class="pproj">43%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>43%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tre Tucker</b> <small>WR · LV</small></div>
+            <span class="pproj">29%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>29%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article>
+    <article class="card b-play" data-day="SUN" data-play="1" data-rank="2">
+      <header class="meta"><span>SUN · 8:20 PM ET</span><span>Lumen Field</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#E31837;color:#fff">KC</span>
+        <div class="tname"><b>Chiefs</b><small>5-0 · Patrick Mahomes</small></div>
+        <div class="proj">22.6</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#002244;color:#69BE28">SEA</span>
+        <div class="tname"><b>Seahawks</b><small>3-3 · Sam Darnold</small></div>
+        <div class="proj">19.1</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>KC 60%</span><span class="cap">WIN PROB</span><span>SEA 40%</span></div>
+        <div class="wpbar"><i style="width:60.0%;background:#E31837"></i><i style="width:40.0%;background:#002244"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>SEA -2.5</span></div>
+          <div><small>MODEL</small><span>KC -3.4</span></div>
+          <div class="edge hot"><small>EDGE</small><span>5.9</span></div>
+        </div>
+        <div class="pick t-play"><span class="tier">PLAY</span>KC +2.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>41.5</span></div>
+          <div><small>MODEL</small><span>41.7</span></div>
+          <div class="edge "><small>EDGE</small><span>0.2</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      <div class="ml">ML VALUE <b>KC +125</b><span>+15.8% vs no-vig</span></div>
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">KC PASS O <em>vs</em> SEA D</span>
+            <span class="sbar"><i class="neg" style="width:1.2%"></i></span>
+            <span class="sval neg">-0.01</span></div>
+          <div class="srow"><span class="slab">KC RUSH O <em>vs</em> SEA D</span>
+            <span class="sbar"><i class="pos" style="width:5.9%"></i></span>
+            <span class="sval pos">+0.04</span></div>
+          <div class="srow"><span class="slab">SEA PASS O <em>vs</em> KC D</span>
+            <span class="sbar"><i class="neg" style="width:14.9%"></i></span>
+            <span class="sval neg">-0.09</span></div>
+          <div class="srow"><span class="slab">SEA RUSH O <em>vs</em> KC D</span>
+            <span class="sbar"><i class="neg" style="width:22.4%"></i></span>
+            <span class="sval neg">-0.13</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>KC D</b><span>MAN 36% · C2 · PRESS 33% · BLITZ 27%</span></div><div class="dline"><b>SEA D</b><span>MAN 29% · C2 · PRESS 32% · BLITZ 21%</span></div></div>
+      <div class="chips"><span class="chip">51°F · 7 MPH</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Patrick Mahomes</b> <small>QB · KC</small></div>
+            <span class="pproj">172.6</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>172.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Kenneth Walker III</b> <small>RB · KC</small></div>
+            <span class="pproj">82.3</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>82.3</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Emmett Johnson</b> <small>RB · KC</small></div>
+            <span class="pproj">15.1</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>15.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Rashee Rice</b> <small>WR · KC</small></div>
+            <span class="pproj">47.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>47.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.5</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Xavier Worthy</b> <small>WR · KC</small></div>
+            <span class="pproj">44.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>44.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Travis Kelce</b> <small>TE · KC</small></div>
+            <span class="pproj">41.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>41.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Rashee Rice</b> <small>WR · KC</small></div>
+            <span class="pproj">4.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.5</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Xavier Worthy</b> <small>WR · KC</small></div>
+            <span class="pproj">3.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Travis Kelce</b> <small>TE · KC</small></div>
+            <span class="pproj">3.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>6.9</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Kenneth Walker III</b> <small>RB · KC</small></div>
+            <span class="pproj">42%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>42%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Rashee Rice</b> <small>WR · KC</small></div>
+            <span class="pproj">25%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>25%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Xavier Worthy</b> <small>WR · KC</small></div>
+            <span class="pproj">24%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>24%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Sam Darnold</b> <small>QB · SEA</small></div>
+            <span class="pproj">253.5</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>253.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Emanuel Wilson</b> <small>RB · SEA</small></div>
+            <span class="pproj">32.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>32.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>George Holani</b> <small>RB · SEA</small></div>
+            <span class="pproj">26.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>26.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Jaxon Smith-Njigba</b> <small>WR · SEA</small></div>
+            <span class="pproj">82.9</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>82.9</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Cooper Kupp</b> <small>WR · SEA</small></div>
+            <span class="pproj">36.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>36.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Rashid Shaheed</b> <small>WR · SEA</small></div>
+            <span class="pproj">36.0</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>36.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>6.0</b></span><span>ZONE <b>8.8</b></span><span class="cov ">COV -2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Jaxon Smith-Njigba</b> <small>WR · SEA</small></div>
+            <span class="pproj">6.3</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.3</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.3</b></span><span>ZONE <b>9.4</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>AJ Barner</b> <small>TE · SEA</small></div>
+            <span class="pproj">3.5</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.5</b></span><span>ZONE <b>6.7</b></span><span class="cov ">COV +1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Cooper Kupp</b> <small>WR · SEA</small></div>
+            <span class="pproj">3.2</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Emanuel Wilson</b> <small>RB · SEA</small></div>
+            <span class="pproj">33%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>33%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Jaxon Smith-Njigba</b> <small>WR · SEA</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Rashid Shaheed</b> <small>WR · SEA</small></div>
+            <span class="pproj">20%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>20%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article></div>
+  </section>
+  <section class="day" data-day="MON">
+    <div class="dayhead"><h2>MONDAY, OCTOBER 26</h2><span>1 GAME</span></div>
+    <div class="grid">
+    <article class="card b-lean" data-day="MON" data-play="1" data-rank="1">
+      <header class="meta"><span>MON · 8:15 PM ET</span><span>Lincoln Financial Field</span></header>
+      
+      <div class="team fav">
+        <span class="badge" style="background:#041E42;color:#fff">DAL</span>
+        <div class="tname"><b>Cowboys</b><small>2-4 · Dak Prescott</small></div>
+        <div class="proj">23.2</div>
+      </div>
+      
+      <div class="team ">
+        <span class="badge" style="background:#004C54;color:#fff">PHI</span>
+        <div class="tname"><b>Eagles</b><small>2-4 · Tanner McKee</small></div>
+        <div class="proj">22.4</div>
+      </div>
+      
+      <div class="wp">
+        <div class="wplab"><span>DAL 53%</span><span class="cap">WIN PROB</span><span>PHI 47%</span></div>
+        <div class="wpbar"><i style="width:52.6%;background:#041E42"></i><i style="width:47.4%;background:#004C54"></i></div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">SPREAD</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>DAL -4.5</span></div>
+          <div><small>MODEL</small><span>DAL -0.9</span></div>
+          <div class="edge hot"><small>EDGE</small><span>3.6</span></div>
+        </div>
+        <div class="pick t-lean"><span class="tier">LEAN</span>PHI +4.5</div>
+      </div>
+      
+      <div class="mkt">
+        <div class="mlabel">TOTAL</div>
+        <div class="cols">
+          <div><small>VEGAS</small><span>44.5</span></div>
+          <div><small>MODEL</small><span>45.6</span></div>
+          <div class="edge "><small>EDGE</small><span>1.1</span></div>
+        </div>
+        <div class="pick none">NO PLAY</div>
+      </div>
+      <div class="ml">ML VALUE <b>PHI +190</b><span>+13.1% vs no-vig</span></div>
+      <div class="strip"><div class="mlabel">EPA MATCHUP <em>(+ = offense edge)</em></div>
+          <div class="srow"><span class="slab">DAL PASS O <em>vs</em> PHI D</span>
+            <span class="sbar"><i class="pos" style="width:22.5%"></i></span>
+            <span class="sval pos">+0.13</span></div>
+          <div class="srow"><span class="slab">DAL RUSH O <em>vs</em> PHI D</span>
+            <span class="sbar"><i class="pos" style="width:8.7%"></i></span>
+            <span class="sval pos">+0.05</span></div>
+          <div class="srow"><span class="slab">PHI PASS O <em>vs</em> DAL D</span>
+            <span class="sbar"><i class="pos" style="width:15.8%"></i></span>
+            <span class="sval pos">+0.10</span></div>
+          <div class="srow"><span class="slab">PHI RUSH O <em>vs</em> DAL D</span>
+            <span class="sbar"><i class="neg" style="width:7.8%"></i></span>
+            <span class="sval neg">-0.05</span></div><div class="mlabel dlab">DEFENSE <em>(man/shell/pressure 2025 · blitz 2026)</em></div><div class="dline"><b>DAL D</b><span>MAN 25% · C3 · PRESS 32% · BLITZ 28%</span></div><div class="dline"><b>PHI D</b><span>MAN 44% · C1 · PRESS 32% · BLITZ 25%</span></div></div>
+      <div class="chips"><span class="chip">59°F · 5 MPH</span><span class="chip">DIVISION</span></div>
+      
+      <button class="ptoggle" aria-expanded="false">PLAYER PROPS · 24<span class="car">▾</span></button>
+      <div class="props" hidden>
+        <div class="pfilt"><button class=on data-pm="all">ALL</button><button data-pm="pass_yds">PASS</button><button data-pm="rush_yds">RUSH</button><button data-pm="rec_yds">REC YDS</button><button data-pm="receptions">REC</button><button data-pm="atd">TD</button></div>
+        
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Dak Prescott</b> <small>QB · DAL</small></div>
+            <span class="pproj">211.4</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>211.4</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Javonte Williams</b> <small>RB · DAL</small></div>
+            <span class="pproj">67.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>67.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Tyler Goodson</b> <small>RB · DAL</small></div>
+            <span class="pproj">16.6</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>16.6</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>CeeDee Lamb</b> <small>WR · DAL</small></div>
+            <span class="pproj">79.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>79.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.4</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV +4%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>George Pickens</b> <small>WR · DAL</small></div>
+            <span class="pproj">65.4</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>65.4</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.5</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Ryan Flournoy</b> <small>WR · DAL</small></div>
+            <span class="pproj">45.2</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>45.2</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>CeeDee Lamb</b> <small>WR · DAL</small></div>
+            <span class="pproj">6.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>6.1</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.4</b></span><span>ZONE <b>7.1</b></span><span class="cov ">COV +4%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>George Pickens</b> <small>WR · DAL</small></div>
+            <span class="pproj">5.0</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.0</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>9.5</b></span><span>ZONE <b>9.3</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Ryan Flournoy</b> <small>WR · DAL</small></div>
+            <span class="pproj">3.8</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.7</b></span><span>ZONE <b>8.0</b></span><span class="cov ">COV 0%</span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Javonte Williams</b> <small>RB · DAL</small></div>
+            <span class="pproj">56%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>56%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>CeeDee Lamb</b> <small>WR · DAL</small></div>
+            <span class="pproj">43%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>43%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>George Pickens</b> <small>WR · DAL</small></div>
+            <span class="pproj">36%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>36%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="pass_yds" data-play="0">
+            <div class="pl"><b>Tanner McKee</b> <small>QB · PHI</small></div>
+            <span class="pproj">187.8</span>
+            <div class="pm"><span class="mk">PASS YDS</span><span>PROJ <b>187.8</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Dameon Pierce</b> <small>RB · PHI</small></div>
+            <span class="pproj">63.5</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>63.5</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rush_yds" data-play="0">
+            <div class="pl"><b>Tank Bigsby</b> <small>RB · PHI</small></div>
+            <span class="pproj">49.0</span>
+            <div class="pm"><span class="mk">RUSH YDS</span><span>PROJ <b>49.0</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>DeVonta Smith</b> <small>WR · PHI</small></div>
+            <span class="pproj">68.8</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>68.8</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>10.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Dallas Goedert</b> <small>TE · PHI</small></div>
+            <span class="pproj">43.5</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>43.5</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.5</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="rec_yds" data-play="0">
+            <div class="pl"><b>Dontayvion Wicks</b> <small>WR · PHI</small></div>
+            <span class="pproj">42.7</span>
+            <div class="pm"><span class="mk">REC YDS</span><span>PROJ <b>42.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>5.2</b></span><span>ZONE <b>7.8</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>DeVonta Smith</b> <small>WR · PHI</small></div>
+            <span class="pproj">5.7</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>5.7</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>7.3</b></span><span>ZONE <b>10.1</b></span><span class="cov ">COV +2%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Dallas Goedert</b> <small>TE · PHI</small></div>
+            <span class="pproj">4.6</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>4.6</b></span><span>LINE <b>none yet</b></span><span>vs MAN <b>8.5</b></span><span>ZONE <b>7.7</b></span><span class="cov ">COV -1%</span></div>
+          </div>
+          <div class="prow" data-m="receptions" data-play="0">
+            <div class="pl"><b>Dameon Pierce</b> <small>RB · PHI</small></div>
+            <span class="pproj">3.1</span>
+            <div class="pm"><span class="mk">RECEPTIONS</span><span>PROJ <b>3.1</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>DeVonta Smith</b> <small>WR · PHI</small></div>
+            <span class="pproj">35%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>35%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Dameon Pierce</b> <small>RB · PHI</small></div>
+            <span class="pproj">31%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>31%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+          <div class="prow" data-m="atd" data-play="0">
+            <div class="pl"><b>Tank Bigsby</b> <small>RB · PHI</small></div>
+            <span class="pproj">22%</span>
+            <div class="pm"><span class="mk">ANYTIME TD</span><span>PROJ <b>22%</b></span><span>LINE <b>none yet</b></span></div>
+          </div>
+      </div>
+    </article></div>
+  </section>
+  <p class="foot">Model trained on in-season team EPA only, shrunk toward league average. Edges in points vs. market. LEAN / PLAY / HAMMER tiers. Not betting advice.</p>
+</div>
+<script>
+document.querySelectorAll('.ptoggle').forEach(b=>b.onclick=()=>{
+  const p=b.nextElementSibling, open=p.hidden; p.hidden=!open; b.setAttribute('aria-expanded',open);
+});
+document.querySelectorAll('.pfilt button').forEach(b=>b.onclick=()=>{
+  const box=b.closest('.props'), f=b.dataset.pm;
+  box.querySelectorAll('.pfilt button').forEach(x=>x.classList.toggle('on',x===b));
+  box.querySelectorAll('.prow').forEach(r=>r.removeAttribute('data-hide'));
+  box.querySelectorAll('.prow').forEach(r=>r.classList.toggle('hide',
+    f==='plays'?r.dataset.play!=='1':(f!=='all'&&r.dataset.m!==f)));
+});
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  const f=b.dataset.f;
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('hide',
+    f==='plays'?c.dataset.play!=='1':(f!=='all'&&c.dataset.day!==f)));
+  document.querySelectorAll('.day').forEach(s=>s.classList.toggle('hide',
+    !s.querySelector('.card:not(.hide)')));
+});
+</script></body></html>
