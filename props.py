@@ -475,24 +475,27 @@ def _fetch_dk_lines(season, week, games, refresh=False):
 NOVIG_CACHE_H = 3     # re-pull Novig props at most every 3 hours
 
 
-def _fetch_novig_props(season, week, refresh=False):
+def _fetch_novig_props(season, week, refresh=False, max_seconds=600):
     """Novig exchange player props (free): {'name_key|mkt': {'line','over','under','fair_over'}}."""
     import time as _t
     f = nfl.DATA / f"props_novig_{season}_wk{week:02d}.json"
-    if f.exists() and not refresh and _t.time() - f.stat().st_mtime < NOVIG_CACHE_H * 3600:
-        return json.loads(f.read_text())
+    old = json.loads(f.read_text()) if f.exists() else {}
+    # a thin pull (rate limited, lines not up yet) never counts as "fresh": try again next run
+    if old and len(old) >= 60 and not refresh and _t.time() - f.stat().st_mtime < NOVIG_CACHE_H * 3600:
+        return old
     try:
         import sys as _s
         _s.path.insert(0, str(nfl.ROOT.parent / "novig"))
         from novig_lines import player_props
-        raw = player_props("NFL")
+        raw = player_props("NFL", max_seconds=max_seconds)   # soonest games go first
     except Exception as ex:
         print(f"  ! novig props: {type(ex).__name__}: {ex}")
         return json.loads(f.read_text()) if f.exists() else {}
-    out = {f"{name_key(p)}|{m}": v for (p, m), v in raw.items()}
+    new = {f"{name_key(p)}|{m}": v for (p, m), v in raw.items()}
+    out = {**old, **new}                       # fresh prices win; lines a blocked lookup missed keep the last good price
     nfl.DATA.mkdir(exist_ok=True)
     f.write_text(json.dumps(out))
-    print(f"  novig props: {len(out)} player-markets")
+    print(f"  novig props: {len(new)} fresh player-markets ({len(out)} total with earlier pulls)")
     return out
 
 
@@ -500,7 +503,9 @@ def fetch_prop_lines(season, week, games, refresh=False):
     """DraftKings (Odds API) when there are credits, plus Novig's exchange props (free) for every player.
     The DK line is what gets priced when it exists; otherwise the Novig line/price is used."""
     lines = _fetch_dk_lines(season, week, games, refresh)
-    nv = _fetch_novig_props(season, week, refresh)
+    have_dk = sum(1 for v in lines.values() if "draftkings" in v.get("books", {})) > 50
+    # with DraftKings lines in hand Novig is just the sharp cross-check: 3 minutes is plenty
+    nv = _fetch_novig_props(season, week, refresh, max_seconds=180 if have_dk else 600)
     for k, v in nv.items():
         e = lines.setdefault(k, {"books": {}})
         e.setdefault("books", {})

@@ -18,6 +18,7 @@ Usage:
 """
 import argparse
 import io
+import json
 import os
 import sys
 import time
@@ -248,17 +249,97 @@ def load_depth(refresh=False):
 OUT_STATUSES = {"Out", "Doubtful"}
 
 
+NFL_TEAMS = {
+    "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
+    "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
+    "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+    "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC",
+    "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LA", "Miami Dolphins": "MIA",
+    "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+    "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF",
+    "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"}
+ESPN_OUT = ("injured reserve", "out", "physically unable", "suspension", "non-football", "reserve")
+
+
+def _nkey(s):
+    import re as _re
+    s = str(s).lower().replace("’", "'")
+    s = _re.sub(r"[.'`,]", "", s)
+    s = _re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
+    return _re.sub(r"\s+", " ", s).strip()
+
+
+def espn_injuries(refresh=False):
+    """ESPN's NFL injury list. Unlike the weekly league report it includes INJURED RESERVE / PUP / suspended
+    players (the league report drops them once they're on IR, so the model thought they could still play).
+    {(name key, team): status}. Cached 3 hours in data/espn_inj_<season>.json (the site's matchups read it too)."""
+    f = DATA / f"espn_inj_{CURRENT_SEASON}.json"
+    if f.exists() and not refresh and time.time() - f.stat().st_mtime < 3 * 3600:
+        return {tuple(k.split("|")): v for k, v in json.loads(f.read_text(encoding="utf-8")).items()}
+    out = {}
+    try:
+        r = requests.get("https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries", timeout=20,
+                         headers={"User-Agent": "Mozilla/5.0 (AlgoHub)"})
+        r.raise_for_status()
+        for t in r.json().get("injuries", []):
+            team = NFL_TEAMS.get(t.get("displayName", ""))
+            if not team:
+                continue
+            for x in t.get("injuries", []):
+                name = (x.get("athlete") or {}).get("displayName")
+                st = str(x.get("status") or "")
+                if name and st:
+                    out[(_nkey(name), team)] = st
+        DATA.mkdir(exist_ok=True)
+        f.write_text(json.dumps({f"{k[0]}|{k[1]}": v for k, v in out.items()}), encoding="utf-8")
+    except Exception as ex:
+        print(f"  ! ESPN injuries: {type(ex).__name__} (official report only)")
+        if f.exists():
+            return {tuple(k.split("|")): v for k, v in json.loads(f.read_text(encoding="utf-8")).items()}
+    return out
+
+
 def injury_report(week):
-    """{gsis_id: dict(name, team, pos, status, practice)} for this week's report."""
+    """{gsis_id: dict(name, team, pos, status, practice)}: this week's official report, plus anyone ESPN lists on
+    injured reserve / PUP / suspended / out (status "Out", practice "IR") that the official report doesn't cover."""
     inj = load_injuries()
-    if inj.empty:
-        return {}
-    w = inj[(inj.season == CURRENT_SEASON) & (inj.week == week)].copy()
-    w["team"] = w.team.replace(TEAM_FIX)
-    return {r.gsis_id: dict(name=r.full_name, team=r.team, pos=r.position,
-                            status=r.report_status if isinstance(r.report_status, str) else "",
-                            practice=r.practice_status if isinstance(r.practice_status, str) else "")
-            for r in w.itertuples()}
+    rep = {}
+    if not inj.empty:
+        w = inj[(inj.season == CURRENT_SEASON) & (inj.week == week)].copy()
+        w["team"] = w.team.replace(TEAM_FIX)
+        rep = {r.gsis_id: dict(name=r.full_name, team=r.team, pos=r.position,
+                               status=r.report_status if isinstance(r.report_status, str) else "",
+                               practice=r.practice_status if isinstance(r.practice_status, str) else "")
+               for r in w.itertuples()}
+    try:
+        es = espn_injuries()
+    except Exception:
+        es = {}
+    if es:
+        ids = {}                                   # (name key, team) -> gsis_id from this season's stats + depth chart
+        ps = load_player_week(CURRENT_SEASON)
+        if not ps.empty:
+            last = ps.sort_values("week").groupby("player_id").tail(1)
+            for r in last.itertuples():
+                ids[(_nkey(r.player_display_name), TEAM_FIX.get(r.team, r.team))] = (r.player_id, r.position)
+        dp = load_depth()
+        if not dp.empty:
+            for r in dp.itertuples():
+                ids.setdefault((_nkey(r.player_name), TEAM_FIX.get(r.team, r.team)), (r.gsis_id, r.pos_abb))
+        added = []
+        for (nm, team), st in es.items():
+            if not any(w_ in st.lower() for w_ in ESPN_OUT) or (nm, team) not in ids:
+                continue
+            pid, pos = ids[(nm, team)]
+            if rep.get(pid, {}).get("status") in OUT_STATUSES:
+                continue
+            ir = "injured reserve" in st.lower() or "reserve" in st.lower() or "physically" in st.lower()
+            rep[pid] = dict(name=nm.title(), team=team, pos=pos, status="Out", practice="IR" if ir else st)
+            added.append(f"{nm.title()} ({team}, {'IR' if ir else st})")
+        if added:
+            print(f"  injuries: +{len(added)} from ESPN not on the official report (IR / out): " + ", ".join(added[:12])
+                  + (" ..." if len(added) > 12 else ""))
+    return rep
 
 
 def auto_qbs(week, inj):
