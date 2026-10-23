@@ -36,7 +36,7 @@ def _s(v):
 
 
 def _kick(r):
-    d = pd.to_datetime(r["gameday"])
+    d = pd.to_datetime(str(r["gameday"])[:10])
     t = _s(r.get("gametime"))
     try:
         t = datetime.strptime(t[:5], "%H:%M").strftime("%I:%M %p").lstrip("0")  # Windows-safe
@@ -235,6 +235,7 @@ def _card(r, props=None):
 
 def render_cards(df, season, week, props=None):
     df = df.copy()
+    df["gameday"] = df.gameday.astype(str).str[:10]          # mixed "2026-10-22" / "2026-10-25 00:00:00" broke this
     df["_order"] = pd.to_datetime(df.gameday).astype("int64")
     df = df.sort_values(["_order", "gametime"])
     sections, days = [], []

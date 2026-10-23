@@ -336,6 +336,9 @@ def am_to_prob(o):
 PRICE_BOOK = "draftkings"   # the book you bet: its line + price is what gets graded
 MIN_FAIR_BOOKS = 2          # other books needed (same line, both sides) for a market fair price
 MAX_VS_MARKET = 0.15        # model prob this far from the market's fair prob -> capped at LEAN
+YDS_TRUST = 0.25            # yardage / receptions: final % = fair + 25% of (model - fair)
+YDS_MAX_GAP = 0.25          # model 25+ points off the market = it's missing news (role, injury): no play
+MAX_PROP_PLAYS = 30         # per week, best edges, one per player (TD lotto separate)
 
 
 def price_market(entry):
@@ -733,7 +736,19 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                     po = td_prob(ln["fair_over"], td_cal) * float(r.wx_mult) if ln["fair_over"] is not None else None
                     rec["td_pct"] = po if po is not None else np.nan     # site 'TD odds' board
                 else:
-                    po = p_over(bundle, mkt, r.proj, ln["line"])
+                    # market-first (same fix as TDs / NBA props): sharp fair % + YDS_TRUST of the model's disagreement.
+                    # Before this, raw model % vs DK's price gave 200 "plays" a week with fake 20-36% edges.
+                    fair = ln["fair_over"]
+                    if fair is None or (isinstance(fair, float) and np.isnan(fair)):
+                        po = None
+                    else:
+                        pm = p_over(bundle, mkt, r.proj, ln["line"])
+                        rec["p_model"] = pm
+                        po = fair + YDS_TRUST * (pm - fair)
+                        if abs(pm - fair) > YDS_MAX_GAP:
+                            rec.update(line=ln["line"], fair=fair, vs_mkt="model way off market: news?")
+                            out.append(rec)
+                            continue
                 if po is None:
                     rec.update(line=ln["line"], vs_mkt="no market")
                     out.append(rec)
@@ -788,6 +803,12 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
     rank = props[nol].groupby(["team", "market"]).proj.rank(ascending=False)
     cap = props.market.map({"pass_yds": 1, "rush_yds": 2, "rec_yds": 3, "receptions": 3, "atd": 3})
     props = props[~nol | (~game_has_lines & (rank.reindex(props.index) <= cap))]
+    # ---- cap: one play per player, best MAX_PROP_PLAYS edges (a 200-play week isn't a card, it's noise)
+    pl = props[props.tier.fillna("") != ""].sort_values("edge", ascending=False)
+    keep_ix = pl.drop_duplicates("player_id").head(MAX_PROP_PLAYS).index
+    drop_ix = pl.index.difference(keep_ix)
+    props.loc[drop_ix, "tier"] = ""
+    props.loc[drop_ix, "vs_mkt"] = "cut (weekly cap)"
     # ---- Lotto TDs
     props["lotto"] = 0
     props["lotto_ratio"] = np.nan

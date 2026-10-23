@@ -63,7 +63,7 @@ K_PLAYS, K_PASS, K_RUSH, K_GAMES, K_QB = 170, 110, 90, 3, 150
 # Starting QBs: by default each team keeps last week's starter. List QB changes here
 # (full name). A QB with no snaps this season gets rated replacement level.
 # Clear an entry once that QB has started a game.
-QB_OVERRIDES = {"TB": "Jalon Daniels", "CHI": "Caleb Williams", "PHI": "Tanner McKee"}
+QB_OVERRIDES = {"TB": "Baker Mayfield"}   # wk7: Baker back. PHI: McKee (last week's starter) with Hurts out
 QB_FROM_SCHEDULE = False   # True = also trust nflverse schedule's projected QBs (often stale)
 REPLACEMENT_QB_PENALTY = 0.12   # EPA/play below league avg for a QB with no stats
 QB_ACTIVE = dict(QB_OVERRIDES)  # schedule starters + manual overrides, filled in by predict()
@@ -1031,6 +1031,8 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
         out = out[~out.game_id.isin(started)]
         out = pd.concat([frozen[frozen.game_id.isin(started)], out], ignore_index=True)
         out = out.sort_values(["gameday", "gametime"]).reset_index(drop=True)
+    out = out.copy()
+    out["gameday"] = pd.to_datetime(out.gameday.astype(str).str[:10]).dt.strftime("%Y-%m-%d")   # one date format
     out[keep].to_csv(PICKS / f"{tag}.csv", index=False)
 
     pr = None
