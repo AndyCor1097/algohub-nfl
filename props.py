@@ -502,13 +502,39 @@ def _fetch_novig_props(season, week, refresh=False, max_seconds=600):
     return out
 
 
+_PREFETCH = {}
+
+
+def prefetch_novig(season, week, max_seconds=240):
+    """Kick off the Novig props pull on a background thread (it's all network waiting).
+    fetch_prop_lines picks up the result instead of pulling again."""
+    import threading
+
+    def run():
+        try:
+            _PREFETCH["res"] = _fetch_novig_props(season, week, False, max_seconds=max_seconds)
+        except Exception as ex:
+            print(f"  ! novig props (background): {type(ex).__name__}: {ex}", flush=True)
+    t = threading.Thread(target=run, daemon=True)
+    _PREFETCH.clear()
+    _PREFETCH.update(t=t, key=(season, week))
+    t.start()
+
+
 def fetch_prop_lines(season, week, games, refresh=False):
     """DraftKings (Odds API) when there are credits, plus Novig's exchange props (free) for every player.
     The DK line is what gets priced when it exists; otherwise the Novig line/price is used."""
     lines = _fetch_dk_lines(season, week, games, refresh)
     have_dk = sum(1 for v in lines.values() if "draftkings" in v.get("books", {})) > 50
     # with DraftKings lines in hand Novig is just the sharp cross-check: 3 minutes is plenty
-    nv = _fetch_novig_props(season, week, refresh, max_seconds=180 if have_dk else 600)
+    t = _PREFETCH.get("t")
+    if t is not None and _PREFETCH.get("key") == (season, week) and not refresh:
+        t.join()                                  # started at the top of the run, usually done by now
+        nv = _PREFETCH.get("res")
+        if nv is None:
+            nv = _fetch_novig_props(season, week, False, max_seconds=120)
+    else:
+        nv = _fetch_novig_props(season, week, refresh, max_seconds=180 if have_dk else 300)
     for k, v in nv.items():
         e = lines.setdefault(k, {"books": {}})
         e.setdefault("books", {})

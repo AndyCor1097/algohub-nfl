@@ -142,8 +142,13 @@ def fetch_all(path, params, page):
     return pd.DataFrame(rows)
 
 
+REFRESH_MIN_AGE = 30 * 60   # a "refresh" within 30 min of the last pull just reuses the saved file
+
+
 def _cached(name, fetch, refresh):
     f = DATA / f"{name}.csv.gz"
+    if refresh and f.exists() and time.time() - f.stat().st_mtime < REFRESH_MIN_AGE:
+        refresh = False
     if f.exists() and not refresh:
         try:
             return pd.read_csv(f, low_memory=False)
@@ -887,12 +892,27 @@ def side_line(team, pts):
     return f"{team} PK" if abs(pts) < 0.05 else f"{team} {pts:+.1f}"
 
 
+def _step(msg, t0=[None]):
+    now = time.time()
+    if t0[0] is None:
+        t0[0] = now
+    print(f"  [{now - t0[0]:5.0f}s] {msg}", flush=True)
+
+
 def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
+    _step("start")
+    if (MODELS / "props_bundle.joblib").exists() and not refresh_lines:
+        try:   # Novig props are the slow part (network): pull them while everything else runs
+            import props as _props
+            _props.prefetch_novig(season, week)
+        except Exception as ex:
+            print(f"  ! novig prefetch: {type(ex).__name__}: {ex}")
     if refresh:
         print(f"refreshing {season} data...")
         load_games(season, True); load_plays(season, True); load_passing(season, True)
         load_player_week(season, True); load_schedule(True)
         load_injuries(True); load_depth(True)
+        _step("data refreshed")
     bundle = joblib.load(MODELS / "nfl_bundle.joblib")
 
     # schedule: ET kickoff times + projected starting QBs (manual QB_OVERRIDES win)
@@ -912,7 +932,9 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     global QB_ACTIVE
     QB_ACTIVE = {**(starters if QB_FROM_SCHEDULE else {}), **inj_qbs, **QB_OVERRIDES}
 
+    _step("injuries + QBs")
     df = build_all()
+    _step("feature frame built")
     wk = df[(df.season == season) & (df.week == week)].copy()
     if wk.empty:
         sys.exit(f"no games found for {season} week {week}")
@@ -1013,6 +1035,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
 
     import intel as intel_mod
     intel = intel_mod.load(refresh_live=refresh)
+    _step("game picks + intel")
     # defense intel shown on each side: a_dline = AWAY team's defense (what the home offense faces)
     out["a_dline"] = out.away_team.map(lambda t: intel_mod.defense_line(intel, t))
     out["h_dline"] = out.home_team.map(lambda t: intel_mod.defense_line(intel, t))
@@ -1038,7 +1061,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     pr = None
     if (MODELS / "props_bundle.joblib").exists():
         import props
-        print("props...")
+        print("props...", flush=True)
         try:
             qbs = {**dict(zip(wk.home_team, wk.h_qb_name)), **dict(zip(wk.away_team, wk.a_qb_name))}
             qbs = {t: n for t, n in qbs.items() if isinstance(n, str)}
@@ -1055,6 +1078,7 @@ def predict(week, season=CURRENT_SEASON, refresh=True, refresh_lines=False):
     else:
         print("  (no props model yet: run `python nfl_algo.py train` to build it)")
 
+    _step("props done")
     from cards import render_cards
     html_path = CARDS / f"{tag}.html"
     html_path.write_text(render_cards(out, season, week, pr), encoding="utf-8")

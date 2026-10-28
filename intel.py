@@ -111,8 +111,10 @@ def build_static(refresh=False):
 
 def build_live(refresh=False):
     """2026 defensive tendencies from FTN charting joined to 2026 pbp."""
+    import time as _t
     f = nfl.DATA / f"intel_def_{nfl.CURRENT_SEASON}.csv.gz"
-    if f.exists() and not refresh:
+    # needs the whole 2026 play-by-play file (big download); defensive tendencies only move weekly
+    if f.exists() and (not refresh or _t.time() - f.stat().st_mtime < 12 * 3600):
         return pd.read_csv(f)
     s = nfl.CURRENT_SEASON
     ftn = _get_csv(f"ftn_charting/ftn_charting_{s}.csv",
