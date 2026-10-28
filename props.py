@@ -336,7 +336,10 @@ def am_to_prob(o):
 PRICE_BOOK = "draftkings"   # the book you bet: its line + price is what gets graded
 MIN_FAIR_BOOKS = 2          # other books needed (same line, both sides) for a market fair price
 MAX_VS_MARKET = 0.15        # model prob this far from the market's fair prob -> capped at LEAN
-YDS_TRUST = 0.25            # yardage / receptions: final % = fair + 25% of (model - fair)
+YDS_TRUST = 0.50            # yardage / receptions: final % = fair + 50% of (model - fair)
+# Backtest wk4-7 on real results: trust 0.25 + the old 3/5/7% tiers = ~0 plays (edges top out ~3%).
+# trust 0.50, 2%+ edge, one per player, 30/wk cap: 120 plays, 55.0%, +7.6u. Raw model alone lost wk7 by -19u.
+YDS_TIERS = [(0.05, "HAMMER"), (0.035, "PLAY"), (0.02, "LEAN")]
 YDS_MAX_GAP = 0.25          # model 25+ points off the market = it's missing news (role, injury): no play
 MAX_PROP_PLAYS = 30         # per week, best edges, one per player (TD lotto separate)
 
@@ -788,7 +791,7 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                 edge = max(e_o, e_u)
                 price = ln["over"] if side == "over" else ln["under"]
                 rec["ev"] = (po if side == "over" else 1 - po) * nfl.am_to_dec(price) - 1
-                tier_ = next((t for thr, t in PROP_TIERS if edge >= thr), "")
+                tier_ = next((t for thr, t in (PROP_TIERS if mkt == "atd" else YDS_TIERS) if edge >= thr), "")
                 if not r.in_model:
                     tier_, rec["vs_mkt"] = "", "low usage"
                 elif mkt == "atd" and not (TD_MIN_PRICE <= ln["over"] <= TD_MAX_PRICE):
