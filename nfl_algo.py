@@ -172,8 +172,64 @@ def _cached(name, fetch, refresh):
     return df
 
 
+GAME_COLS = ["game_id", "season", "week", "game_type", "gameday", "gametime", "home_team", "away_team",
+             "home_score", "away_score", "overtime", "stadium", "roof", "surface", "temp", "wind",
+             "spread_line", "total_line", "div_game"]
+
+
 def load_games(season, refresh=False):
-    return _cached(f"games_{season}", lambda: fetch_all("/games", {"season": season}, 1000), refresh)
+    df = _cached(f"games_{season}", lambda: fetch_all("/games", {"season": season}, 1000), refresh)
+    if season >= CURRENT_SEASON:
+        df = _fill_from_schedule(df, season, refresh)
+    return df
+
+
+def _fill_from_schedule(df, season, refresh):
+    """nfldata.org stopped updating (Oct 28 2026: no week 8 scores) -> fill finals from the nflverse
+    schedule, which updates within hours of every game. Same game_id format, same columns."""
+    try:
+        sc = load_schedule(refresh)
+    except Exception as ex:
+        print(f"  ! schedule backup for scores: {type(ex).__name__}", flush=True)
+        return df
+    if sc is None or sc.empty or "season" not in sc.columns:
+        return df
+    s = sc[sc.season == season]
+    if s.empty:
+        return df
+    if df is None or df.empty or "game_id" not in df.columns:
+        return s[[c for c in GAME_COLS if c in s.columns]].reset_index(drop=True)
+    df = df.copy()
+    sm = s.set_index("game_id")
+    n0 = int(df.home_score.notna().sum())
+    for c in ("home_score", "away_score"):
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(df.game_id.map(sm[c]))
+    extra = s[~s.game_id.isin(df.game_id)]
+    if len(extra):
+        df = pd.concat([df, extra[[c for c in GAME_COLS if c in extra.columns]]], ignore_index=True)
+    n1 = int(df.home_score.notna().sum())
+    if n1 > n0:
+        print(f"  games_{season}: {n1 - n0} final scores filled from the nflverse schedule", flush=True)
+    return df
+
+
+def _plays_from_nflverse(season):
+    """Backup play-by-play (nflverse), same shape as nfldata's /plays."""
+    try:
+        r = requests.get(f"{NFLVERSE}/pbp/play_by_play_{season}.csv.gz", timeout=300)
+        if r.status_code != 200:
+            return pd.DataFrame()
+        use = ["game_id", "season", "week", "posteam", "defteam", "play_type", "yards_gained", "epa",
+               "interception", "fumble_lost"]
+        pb = pd.read_csv(io.BytesIO(r.content), compression="gzip", low_memory=False,
+                         usecols=lambda c: c in use)
+    except Exception as ex:
+        print(f"  ! nflverse pbp {season}: {type(ex).__name__}: {ex}", flush=True)
+        return pd.DataFrame()
+    pb = pb[pb.play_type.isin(["pass", "run"])].copy()
+    pb["turnover"] = ((pd.to_numeric(pb.get("interception"), errors="coerce").fillna(0) > 0) |
+                      (pd.to_numeric(pb.get("fumble_lost"), errors="coerce").fillna(0) > 0)).astype(int)
+    return pb[["game_id", "season", "week", "posteam", "defteam", "play_type", "yards_gained", "turnover", "epa"]]
 
 
 def load_plays(season, refresh=False):
@@ -187,7 +243,26 @@ def load_plays(season, refresh=False):
             parts.append(fetch_all("/plays", {"season": season, "play_type": pt}, 500))
         df = pd.concat(parts, ignore_index=True)
         return df[[c for c in cols if c in df.columns]]
-    return _cached(f"plays_{season}", fetch, refresh)
+    df = _cached(f"plays_{season}", fetch, refresh)
+    if refresh and season >= CURRENT_SEASON:
+        # nfldata stopped updating: if it's missing finished weeks, take nflverse's play-by-play instead
+        try:
+            g = load_games(season)
+            done = g[pd.to_numeric(g.home_score, errors="coerce").notna()]
+            done = done[done.get("game_type", "REG").fillna("REG") == "REG"] if "game_type" in done else done
+            need = int(done.week.max()) if len(done) else 0
+            have = int(pd.to_numeric(df.week, errors="coerce").max()) if len(df) else 0
+            if need > have:
+                print(f"  plays_{season}: nfldata stops at week {have}, finished games through week {need}"
+                      " -> nflverse play-by-play", flush=True)
+                nv = _plays_from_nflverse(season)
+                if len(nv) and int(nv.week.max()) >= need:
+                    nv.to_csv(DATA / f"plays_{season}.csv.gz", index=False)
+                    df = nv
+                    print(f"  plays_{season}: {len(nv):,} rows from nflverse", flush=True)
+        except Exception as ex:
+            print(f"  ! plays backup: {type(ex).__name__}: {ex}", flush=True)
+    return df
 
 
 def load_passing(season, refresh=False):
