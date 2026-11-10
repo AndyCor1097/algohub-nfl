@@ -54,7 +54,7 @@ TRACKER = ROOT / "tracker.csv"
 
 # Edge thresholds (points). Below the lowest = NO PLAY.
 SPREAD_TIERS = [(6.0, "HAMMER"), (4.5, "PLAY"), (3.0, "LEAN")]  # sides are sharp: only fire on big gaps
-TOTAL_TIERS = [(6.0, "HAMMER"), (4.0, "PLAY"), (2.5, "LEAN")]
+TOTAL_TIERS = [(7.0, "HAMMER"), (5.0, "PLAY"), (3.5, "LEAN")]   # raised Nov 2026: totals 14-20 (-7.3u) thru wk8
 ML_EDGE = 0.04               # model win prob minus no-vig implied prob
 
 # Shrinkage strength (in plays / games). Bigger = pulls harder toward league avg.

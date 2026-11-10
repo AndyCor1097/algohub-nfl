@@ -340,6 +340,9 @@ YDS_TRUST = 0.50            # yardage / receptions: final % = fair + 50% of (mod
 # Backtest wk4-7 on real results: trust 0.25 + the old 3/5/7% tiers = ~0 plays (edges top out ~3%).
 # trust 0.50, 2%+ edge, one per player, 30/wk cap: 120 plays, 55.0%, +7.6u. Raw model alone lost wk7 by -19u.
 YDS_TIERS = [(0.05, "HAMMER"), (0.035, "PLAY"), (0.02, "LEAN")]
+REC_YDS_EXTRA = 0.015      # receiving yards: weakest market (1-5 in wk8, worst over the season) -> stricter
+# Yardage/receptions LEANs still show on the cards but are NOT graded: 131-133 (-8.2u) through week 8.
+GRADE_YDS_LEANS = False
 YDS_MAX_GAP = 0.25          # model 25+ points off the market = it's missing news (role, injury): no play
 MAX_PROP_PLAYS = 30         # per week, best edges, one per player (TD lotto separate)
 
@@ -791,7 +794,9 @@ def predict(wk, season, week, starters, refresh_lines=False, injuries=None, fram
                 edge = max(e_o, e_u)
                 price = ln["over"] if side == "over" else ln["under"]
                 rec["ev"] = (po if side == "over" else 1 - po) * nfl.am_to_dec(price) - 1
-                tier_ = next((t for thr, t in (PROP_TIERS if mkt == "atd" else YDS_TIERS) if edge >= thr), "")
+                # receiving yards has been the weakest prop market: it needs 1.5 pts more edge for the same tier
+                need = edge - (REC_YDS_EXTRA if mkt == "rec_yds" else 0.0)
+                tier_ = next((t for thr, t in (PROP_TIERS if mkt == "atd" else YDS_TIERS) if need >= thr), "")
                 if not r.in_model:
                     tier_, rec["vs_mkt"] = "", "low usage"
                 elif mkt == "atd" and not (TD_MIN_PRICE <= ln["over"] <= TD_MAX_PRICE):
@@ -863,6 +868,8 @@ def grade(season, week):
     props = pd.read_csv(f)
     lotto = props.get("lotto", pd.Series(0, index=props.index)).fillna(0).astype(int) == 1
     props = props[(props.tier.fillna("") != "") | lotto].copy()
+    if not GRADE_YDS_LEANS:      # leans on yardage/receptions: shown as info, kept off the record
+        props = props[~((props.tier == "LEAN") & (props.market != "atd"))]
     is_l = props.get("lotto", pd.Series(0, index=props.index)).fillna(0).astype(int) == 1
     props.loc[is_l & (props.tier.fillna("") == ""), "tier"] = "LOTTO"
     st = load_stats(refresh_current=True)
